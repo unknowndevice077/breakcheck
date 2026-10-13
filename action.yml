@@ -38,6 +38,10 @@ inputs:
     description: 'Fail the check when any breaking change affects (or possibly affects) this repo.'
     required: false
     default: 'false'
+  typecheck:
+    description: 'Type-check the TypeScript files that import each bumped package against its old and new type declarations (downloaded from the npm registry), and report what no longer compiles.'
+    required: false
+    default: 'true'
   copilot-cli-version:
     description: 'Version of @github/copilot to run for the copilot provider.'
     required: false

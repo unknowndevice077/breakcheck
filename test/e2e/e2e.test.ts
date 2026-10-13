@@ -20,6 +20,7 @@ import {
   type CannedModel,
   type Route,
 } from './harness.js';
+import { widget } from '../typecheck.test.js';
 
 const CTX: RunContext = { owner: 'acme', repo: 'shop', pr: 7, baseSha: 'b45e000000000000000000000000000000000001', headSha: 'c0ffee0000000000000000000000000000000002' };
 
@@ -164,6 +165,7 @@ interface RunOpts {
   anthropic?: Parameters<typeof anthropicHandler>[1];
   copilotFail?: { code: number; stderr: string };
   existingComments?: { id: number; body: string }[];
+  tarball?: (name: string, version: string) => Promise<Uint8Array | null>;
 }
 
 async function execute(s: Scenario, opts: RunOpts) {
@@ -181,7 +183,7 @@ async function execute(s: Scenario, opts: RunOpts) {
   });
   const gateway = new ModelGateway(provider);
   const gh = createGitHubApi('ghs_test', { fetch: rec.fetch });
-  const result = await run(CTX, { gh, registry: createRegistry({ fetch: rec.fetch, baseUrl: 'https://registry.npmjs.org' }), cache: opts.cache ?? createMemoryCache(), gateway, workspace: s.workspace, ...(reason ? { providerReason: reason } : {}) }, { includePatch: false, maxPackages: 10 });
+  const result = await run(CTX, { gh, registry: createRegistry({ fetch: rec.fetch, baseUrl: 'https://registry.npmjs.org' }), cache: opts.cache ?? createMemoryCache(), gateway, workspace: s.workspace, ...(reason ? { providerReason: reason } : {}), ...(opts.tarball ? { tarball: opts.tarball } : {}) }, { includePatch: false, maxPackages: 10 });
   const posted = rec.requests.filter((r) => /\/issues\/(7\/)?comments/.test(r.url) && (r.method === 'POST' || r.method === 'PATCH'));
   // Only tag-existence probes may miss; anything else means the recording is incomplete.
   const unexpected = rec.unmatched.filter((u) => !u.includes('/git/ref/tags/'));
@@ -360,6 +362,78 @@ describe('specific outcomes', () => {
     expect(body).toContain("the package's repository (git+https://gitlab.com/acme/ui-kit.git) is not on GitHub");
     expect(r.gateway.calls).toEqual([]);
     await expect(body).toMatchFileSnapshot('./__snapshots__/missing.md');
+  });
+});
+
+describe('type-check against old and new declarations', () => {
+  const scenario = (): Scenario => ({
+    name: 'typecheck',
+    workspace: fixturePath('projects/typecheck'),
+    routes: [
+      ...prRoutes({ ...CTX, files: { 'package.json': { base: manifest({ widget: '^1.0.0' }), head: manifest({ widget: '^2.0.0' }) } } }),
+      registryRoute('widget', '2.0.0', { name: 'widget', version: '2.0.0', repository: 'git+https://gitlab.com/acme/widget.git' }),
+    ],
+  });
+  const tarball = async (_n: string, v: string) => widget[v as keyof typeof widget] ?? null;
+  const model: CannedModel = {
+    extraction: { breakingChanges: [] },
+    verdicts: {
+      'typescript-errors@src/use.ts:1': { affected: 'yes', reason: 'oldFn was removed', fix: { before: "import { oldFn, configure, same } from 'widget'", after: "import { configure, same } from 'widget'" } },
+      'typescript-errors@src/use.ts:5': { affected: 'no', reason: 'model disagrees', fix: { before: 'configure({ legacy: true })', after: 'configure({ modern: true })' } },
+    } as unknown as CannedModel['verdicts'],
+  };
+
+  it('finds compile breaks even when no release notes exist, with the compiler as the verdict', async () => {
+    const r = await execute(scenario(), { provider: 'copilot', model, tarball });
+    expect(r.unexpected.filter((u) => !/lock|shrinkwrap/.test(u))).toEqual([]);
+    const pkg = r.result.report!.packages[0]!;
+    expect(pkg.typecheck).toEqual({ ran: true, files: 2, errors: 2 });
+    const c = pkg.changes[0]!;
+    expect(c.change.id).toBe('typescript-errors');
+    expect(c.hits.map((h) => [h.file, h.line, h.verdict, h.reason.slice(0, 7), h.fix?.after])).toEqual([
+      ['src/use.ts', 1, 'yes', 'TS2305:', "import { configure, same } from 'widget'"],
+      // the compiler, not the model, decides the verdict; a fix from a model that disagrees is not trusted
+      ['src/use.ts', 5, 'yes', 'TS2353:', undefined],
+    ]);
+    const body = commentBody(r.posted);
+    expect(body).toContain('Code that no longer type-checks against widget 2.0.0');
+    expect(body).toContain('Type-checked the files importing widget against the old and new type declarations.');
+  });
+
+  it('confirms note-based hits the compiler rejects and rules out removals that still compile', async () => {
+    const withNotes: CannedModel = {
+      extraction: {
+        breakingChanges: [
+          { id: 'old-fn', summary: 'oldFn was removed', kind: 'removed', affectedSymbols: [{ name: 'oldFn', type: 'export' }], searchPatterns: [], fileGlobs: [], migration: [], sourceUrl: null, confidence: 'high' },
+          { id: 'same-gone', summary: 'same was removed (wrongly claimed)', kind: 'removed', affectedSymbols: [{ name: 'same', type: 'export' }], searchPatterns: [], fileGlobs: [], migration: [], sourceUrl: null, confidence: 'high' },
+        ],
+      },
+      verdicts: {
+        'old-fn@src/use.ts:1': { affected: 'unsure', reason: 'cannot tell', fix: null },
+        'old-fn@src/use.ts:4': { affected: 'yes', reason: 'calls oldFn', fix: null },
+        'same-gone@src/use.ts:1': { affected: 'yes', reason: 'imports same', fix: null },
+        'same-gone@src/use.ts:6': { affected: 'yes', reason: 'calls same', fix: null },
+        'same-gone@src/clean.ts:1': { affected: 'yes', reason: 'imports same', fix: null },
+        'same-gone@src/clean.ts:3': { affected: 'yes', reason: 'calls same', fix: null },
+        'typescript-errors@src/use.ts:5': { affected: 'yes', reason: 'legacy option', fix: null },
+      } as unknown as CannedModel['verdicts'],
+    };
+    const s = scenario();
+    s.routes = s.routes.map((r) => (r.url.endsWith('/widget/2.0.0') ? { ...r, json: { name: 'widget', version: '2.0.0', repository: 'git+https://github.com/acme/widget.git' } } : r));
+    s.routes.push(
+      { url: 'https://api.github.com/repos/acme/widget/releases?per_page=100&page=1', json: [{ tag_name: 'v2.0.0', name: 'v2.0.0', body: '## Breaking\n\n- `oldFn` was removed', html_url: 'https://github.com/acme/widget/releases/tag/v2.0.0', draft: false, prerelease: false }] },
+      { url: 'https://api.github.com/repos/acme/widget/git/trees/v2.0.0?recursive=1', json: { truncated: false, tree: [] } },
+    );
+    const r = await execute(s, { provider: 'copilot', model: withNotes, tarball });
+    const pkg = r.result.report!.packages[0]!;
+    const verdicts = (id: string) => pkg.changes.find((c) => c.change.id === id)!.hits.map((h) => `${h.file}:${h.line}=${h.verdict}`);
+    expect(verdicts('old-fn')).toEqual(['src/use.ts:1=yes', 'src/use.ts:4=yes']);
+    expect(pkg.changes.find((c) => c.change.id === 'old-fn')!.hits[0]!.reason).toMatch(/^Confirmed by the TypeScript compiler: TS2305/);
+    // `same` still exists: nothing the compiler reports mentions it, so every claim is ruled out,
+    // even on line 1, which fails only because of `oldFn`
+    expect(verdicts('same-gone')).toEqual(['src/clean.ts:1=no', 'src/clean.ts:3=no', 'src/use.ts:1=no', 'src/use.ts:6=no']);
+    // line 5 is not explained by any note, so it is reported on its own
+    expect(verdicts('typescript-errors')).toEqual(['src/use.ts:5=yes']);
   });
 });
 
