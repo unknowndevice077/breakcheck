@@ -59,8 +59,8 @@ function reactRouter(): Scenario {
         repo: 'react-router',
         releases,
         ref: 'react-router@7.1.0',
-        files: { 'docs/upgrading/v6.md': fixture('upstream/react-router.upgrading-v6.md') },
-        otherPaths: ['packages/react-router/CHANGELOG.md', 'docs/upgrading/remix.md', 'docs/upgrading/component-routes.md', 'README.md'],
+        files: { 'docs/upgrading/v6.md': fixture('upstream/react-router.upgrading-v6.md'), 'packages/react-router/CHANGELOG.md': changelog },
+        otherPaths: ['docs/upgrading/remix.md', 'docs/upgrading/component-routes.md', 'README.md'],
       }),
     ],
   };
@@ -290,6 +290,34 @@ describe('specific outcomes', () => {
     expect(pkg.notes.sources.map((x) => x.kind)).toEqual(['changelog', 'migration-guide']);
     expect(pkg.notes.text).not.toContain('=== Release ');
     expect(pkg.changes.some((c) => c.change.affectedSymbols.some((x) => x.name === 'json') && c.hits.some((h) => h.line === 7))).toBe(true);
+  });
+
+  it('express: a summary-only v5.0.0 release is supplemented by History.md (rule-based finds the APIs)', async () => {
+    // Real shape of expressjs/express v5.0.0: the release names no APIs; History.md lists them.
+    const s = express();
+    s.routes = [
+      ...s.routes.filter((r) => !r.url.includes('/repos/expressjs/express/')),
+      ...upstreamRoutes({
+        owner: 'expressjs',
+        repo: 'express',
+        releases: [
+          { tag: 'v5.0.1', body: '## What\'s Changed\n* Update `cookie` semver lock to address CVE-2024-47764 by someone in #6016\n' },
+          {
+            tag: 'v5.0.0',
+            body: '## Breaking changes\n- Dropped support for Node.js versions before v18.\n- Deprecated APIs: old method signatures from Express v3 and v4 were removed.\n- Routing now uses path-to-regexp@8.x.\n\nSee the migration guide at https://expressjs.com/en/guide/migrating-5.html for all breaking changes.',
+          },
+        ],
+        tags: ['v5.0.1'],
+        ref: 'v5.0.1',
+        files: { 'History.md': fixture('upstream/express.History.md') },
+      }),
+    ];
+    const r = await execute(s, { provider: 'none' });
+    expect(r.unexpected).toEqual([]);
+    const pkg = r.result.report!.packages[0]!;
+    expect(pkg.notes.sources.map((x) => x.kind)).toEqual(['release', 'release', 'changelog']);
+    const flagged = pkg.changes.flatMap((c) => c.hits.map((h) => `${h.line}:${h.matched}`));
+    expect(flagged).toEqual(expect.arrayContaining(['20:app.del', '16:req.param', '25:res.sendfile']));
   });
 
   it('express (AI): the model separates res.json(obj) from res.json(obj, status)', async () => {

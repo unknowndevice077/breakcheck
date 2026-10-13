@@ -54,17 +54,29 @@ export async function gatherNotes(gh: GitHubApi, registry: Registry, bump: Bump,
   const tree = await gh.listTree(owner, r, ref ?? 'HEAD');
   const paths = tree?.paths ?? [];
 
-  // 2. CHANGELOG fallback when releases had nothing useful for this range
+  // 2. CHANGELOG: the fallback when releases had nothing useful, and for major bumps a
+  //    supplement when a release only summarises ("old method signatures were removed")
+  //    while the changelog lists the APIs (Express 5).
   const releaseText = informative.map((x) => x.body).join('\n');
-  if (releaseText.trim().length < 200) {
+  const releasesUseless = releaseText.trim().length < 200;
+  if (releasesUseless || bump.bumpType === 'major') {
     const file = pickChangelog(paths, repo.directory);
     const content = file ? await gh.getFile(owner, r, file, ref) : null;
     if (file && content) {
       const url = `https://github.com/${owner}/${r}/blob/${ref ?? 'HEAD'}/${file}`;
+      const releaseLength = new Map(informative.map((x) => [x.version, x.body.length]));
+      const majors = new Set(majorsCrossed(from, to));
+      let added = 0;
       for (const b of sliceChangelog(content, from, to)) {
+        if (!releasesUseless) {
+          const isMajorEntry = majors.has(semver.major(b.version)) && semver.minor(b.version) === 0 && semver.patch(b.version) === 0;
+          const detailedThanRelease = b.text.length > 2 * (releaseLength.get(b.version) ?? 0);
+          if (!isMajorEntry || !detailedThanRelease) continue;
+        }
         blocks.push({ title: `${file} ${b.heading}`, url, body: b.text, version: b.version });
+        added++;
       }
-      if (blocks.length > informative.length) sources.push({ kind: 'changelog', url, title: file });
+      if (added) sources.push({ kind: 'changelog', url, title: file });
     }
   }
 
