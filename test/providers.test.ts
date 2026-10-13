@@ -132,3 +132,15 @@ describe('batchHits', () => {
     expect(batchHits([1, 2, 3].map((n) => hit(n, 600)), 8, 1000).map((b) => b.length)).toEqual([1, 1, 1]);
   });
 });
+
+import { fixMatchesSnippet } from '../src/verify/verify.js';
+describe('fixMatchesSnippet', () => {
+  const snippet = '  4 | export default function Page() {\n> 5 |   const theme = cookies().get(\'theme\');\n  6 |   return theme;';
+  it('accepts code that appears in the snippet, ignoring the gutter and whitespace', () => {
+    expect(fixMatchesSnippet("const theme = cookies().get('theme');", snippet)).toBe(true);
+    expect(fixMatchesSnippet("export default function Page() {\n  const theme =   cookies().get('theme');", snippet)).toBe(true);
+  });
+  it('rejects invented "before" code', () => {
+    expect(fixMatchesSnippet('const theme = headers();', snippet)).toBe(false);
+  });
+});

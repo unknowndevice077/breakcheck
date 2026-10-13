@@ -22,8 +22,10 @@ export interface FinderResult {
   hits: Map<string, UsageHit[]>;
   /** Repo-relative files that import the package */
   importingFiles: string[];
-  /** Human-readable notes about what could not be analysed */
+  /** Human-readable notes about what could not be analysed (shown in the comment) */
   unanalysed: string[];
+  /** Internal notes for the job log, e.g. patterns that were ignored */
+  diagnostics: string[];
 }
 
 /** Local names bound to the package in one file. */
@@ -225,6 +227,7 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
   const importPaths = [...new Set(changes.flatMap((c) => c.affectedSymbols.filter((s) => s.type === 'import-path').map((s) => s.name)))].filter((p) => p !== pkg);
   const shortName = pkg.replace(/^@[^/]+\//, '');
   const unanalysed: string[] = [];
+  const diagnostics: string[] = [];
   const hitMap = new Map<string, Map<string, UsageHit>>();
   const extraCounts = new Map<string, number>();
   const textCache = new Map<string, string[]>();
@@ -338,7 +341,10 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
           const prop = parts.at(-1) ?? sym.name;
           const recvName = parts.slice(0, -1).join('.');
           // `ReactDOM.render` for react-dom, `express.query` for express: the receiver is the package itself
-          const recvIsPackage = norm(recvName) === norm(shortName) || recvName === pkg || [...b.named.values()].some((i) => i.imported === recvName);
+          // An imported lowercase object (`vi.fn` from vitest) is static too; an imported PascalCase
+          // class/type (`NextRequest.geo`, `QueryClient.x`) describes instances, matched by property name.
+          const importedObject = /^[a-z_$]/.test(recvName) && [...b.named.values()].some((i) => i.imported === recvName);
+          const recvIsPackage = norm(recvName) === norm(shortName) || recvName === pkg || importedObject;
           for (const pa of propAccesses) {
             if (pa.getName() !== prop) continue;
             const recv = pa.getExpression().getText();
@@ -399,12 +405,12 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
       const re = globToRegex(g);
       // A glob matching files every project has (package.json, lockfiles) says nothing about usage.
       if (UBIQUITOUS_FILES.some((f) => re.test(f))) {
-        unanalysed.push(`${change.id}: ignored file pattern \`${g}\` (matches files every project has)`);
+        diagnostics.push(`${change.id}: ignored file pattern \`${g}\` (matches files every project has)`);
         continue;
       }
       // Source files are searched for symbols; their mere existence proves nothing.
       if (SAMPLE_SOURCE_FILES.some((f) => re.test(f) || re.test(path.posix.basename(f)))) {
-        unanalysed.push(`${change.id}: ignored file pattern \`${g}\` (matches source files)`);
+        diagnostics.push(`${change.id}: ignored file pattern \`${g}\` (matches source files)`);
         continue;
       }
       for (const f of files) if (re.test(path.posix.basename(f)) || re.test(f)) add(change, f, 1, 'file', g);
@@ -418,5 +424,5 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
     const extra = extraCounts.get(change.id);
     if (extra) unanalysed.push(`${change.id}: ${extra} more matching location(s) not listed (limit ${maxHits} per change)`);
   }
-  return { hits, importingFiles: importing.map((i) => i.file), unanalysed };
+  return { hits, importingFiles: importing.map((i) => i.file), unanalysed, diagnostics };
 }

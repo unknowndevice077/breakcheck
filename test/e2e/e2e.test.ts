@@ -6,7 +6,7 @@ import { createRegistry } from '../../src/notes/registry.js';
 import { createProvider, ModelGateway, type ProviderSetting } from '../../src/providers/index.js';
 import { MARKER } from '../../src/report/render.js';
 import { renderSummary } from '../../src/report/summary.js';
-import { run, type RunContext } from '../../src/run.js';
+import { ruleSupplement, run, type RunContext } from '../../src/run.js';
 import {
   anthropicHandler,
   copilotRunner,
@@ -406,3 +406,13 @@ describe('caching and comment lifecycle', () => {
 function react() {
   return reactRouter();
 }
+
+describe('ruleSupplement', () => {
+  const ch = (id: string, names: string[]) => ({ id, summary: id, kind: 'removed' as const, affectedSymbols: names.map((name) => ({ name, type: 'export' as const })), searchPatterns: [], fileGlobs: [], migration: [], sourceUrl: null, confidence: 'low' as const });
+  it('treats a class as covered when the AI already named one of its members', () => {
+    expect(ruleSupplement([ch('geo', ['NextRequest.geo'])], [ch('nextrequest', ['NextRequest'])])).toEqual([]);
+  });
+  it('keeps genuinely new symbols', () => {
+    expect(ruleSupplement([ch('defer', ['defer'])], [ch('json', ['json'])]).map((c) => c.id)).toEqual(['rules-json']);
+  });
+});
