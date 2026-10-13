@@ -93,6 +93,7 @@ export async function run(ctx: RunContext, deps: RunDeps, opts: RunOptions): Pro
 
 async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Promise<PackageReport> {
   const { gateway } = deps;
+  const log = deps.log ?? (() => {});
   const unanalysed: string[] = [];
   let notes: ReleaseNotes;
   try {
@@ -156,6 +157,15 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Prom
   }
   const verification = await verifyHits(mode === 'ai' ? gateway : disabledGateway(gateway), bump, changes, hits);
   if (verification.error) unanalysed.push(`AI verification failed for some locations, shown as "possibly": ${verification.error}`);
+
+  // What was searched and what came of it, for anyone reading the job log.
+  log(`::group::${bump.name}: ${changes.length} breaking change(s), ${mode === 'ai' ? 'AI' : 'rule-based'}${fromCache ? ' (cached extraction)' : ''}`);
+  for (const c of changes) {
+    const searched = [...c.affectedSymbols.map((s) => `${s.type}:${s.name}`), ...c.searchPatterns.map((p) => `pattern:${p}`), ...c.fileGlobs.map((g) => `file:${g}`)];
+    const found = (verification.verified.get(c.id) ?? []).map((h) => `${h.file}:${h.line}=${h.verdict}`);
+    log(`${c.id}: searched [${searched.join(', ') || 'nothing'}] → ${found.join(', ') || 'no matches'}`);
+  }
+  log('::endgroup::');
 
   return {
     bump,

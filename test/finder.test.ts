@@ -112,6 +112,13 @@ describe('findUsages: eslint config, CLI flags and file globs', () => {
   });
 });
 
+describe('findUsages: the package itself as an import path', () => {
+  it('is ignored, since it would match every import', () => {
+    const res = findUsages(root, 'react-router', [change('whole-pkg', { affectedSymbols: [{ name: 'react-router', type: 'import-path' }] })]);
+    expect(res.hits.get('whole-pkg')).toEqual([]);
+  });
+});
+
 describe('findUsages: file globs every project matches', () => {
   it('ignores package.json/lockfile globs instead of flagging every repo', () => {
     const res = findUsages(root, 'react-router', [change('node-20', { kind: 'runtime', fileGlobs: ['package.json', '**/package-lock.json'] })]);

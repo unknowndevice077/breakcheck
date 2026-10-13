@@ -298,6 +298,7 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
     for (const change of changes) {
       for (const sym of change.affectedSymbols) {
         if (sym.type === 'import-path') {
+          if (sym.name === pkg) continue; // would match every import of the package
           for (const il of b.importLines) if (matchesPackage(il.specifier, sym.name)) add(change, file, il.line, 'symbol', il.specifier);
           continue;
         }
