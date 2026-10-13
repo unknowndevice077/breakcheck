@@ -73,7 +73,8 @@ export async function gatherNotes(gh: GitHubApi, registry: Registry, bump: Bump,
           const detailedThanRelease = b.text.length > 2 * (releaseLength.get(b.version) ?? 0);
           if (!isMajorEntry || !detailedThanRelease) continue;
         }
-        blocks.push({ title: `${file} ${b.heading}`, url, body: b.text, version: b.version });
+        // As a supplement, these entries are the detailed list the release summarised: keep them first.
+        blocks.push({ title: `${file} ${b.heading}`, url, body: b.text, version: b.version, ...(releasesUseless ? {} : { priorityFloor: 3 }) });
         added++;
       }
       if (added) sources.push({ kind: 'changelog', url, title: file });

@@ -1,5 +1,5 @@
 <!-- breakcheck:comment -->
-## ✅ No breaking changes found that affect your code (5 checked)
+## ✅ No breaking changes found that affect your code (5 checked, 1 can't be checked automatically)
 
 _breakcheck reads the release notes for each dependency bump in this PR and searches this repo for code the breaking changes touch._
 
