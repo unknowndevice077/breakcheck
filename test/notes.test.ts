@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { gatherNotes, isPointerOnly, pickChangelog, pickMigrationGuides } from '../src/notes/fetch.js';
+import { assembleNotes } from '../src/notes/sections.js';
 import type { GitHubApi, Release } from '../src/github.js';
 import { parseGitHubRepo } from '../src/notes/registry.js';
 
@@ -106,5 +107,37 @@ describe('checkSourceUrl', () => {
   it('replaces invented links with a real source', () => {
     expect(checkSourceUrl('https://github.com/react/react/releases/tag/v19.0.0', notes)).toBe('https://github.com/facebook/react/releases/tag/v19.0.0');
     expect(checkSourceUrl(null, notes)).toBe('https://github.com/facebook/react/releases/tag/v19.0.0');
+  });
+});
+
+describe('pickMigrationGuides: benchmark regressions', () => {
+  it('skips guides in a directory named for another version (zod docs-v3/MIGRATION.md is the v2→v3 guide)', () => {
+    expect(pickMigrationGuides(['packages/docs-v3/MIGRATION.md', 'packages/docs/content/v4/changelog.mdx', 'packages/docs/content/v4/migration.mdx'], undefined, [4], 3, 'zod')).toEqual(['packages/docs/content/v4/migration.mdx']);
+  });
+
+  it('reads "from v5 to v6" as a v6 guide', () => {
+    expect(pickMigrationGuides(['docs/framework/svelte/migrate-from-v5-to-v6.md'], undefined, [5], 4, '@tanstack/query-core')).toEqual([]);
+  });
+
+  it('keeps one copy of a guide repeated per framework, preferring the package\'s own', () => {
+    const paths = ['docs/framework/vue/guides/migrating-to-v5.md', 'docs/framework/react/guides/migrating-to-v5.md', 'docs/framework/solid/guides/migrating-to-v5.md'];
+    expect(pickMigrationGuides(paths, undefined, [5], 4, '@tanstack/react-query')).toEqual(['docs/framework/react/guides/migrating-to-v5.md']);
+    expect(pickMigrationGuides(paths, undefined, [5], 4, '@tanstack/query-core')).toHaveLength(1);
+  });
+});
+
+describe('assembleNotes: several majors', () => {
+  it('keeps each x.0.0 release when a long guide covers only one of the majors', () => {
+    const guide = `## Breaking changes\n\n${'- the v7 guide says something long here\n'.repeat(900)}`;
+    const blocks = [
+      { title: 'v4.0.0', url: 'u4', version: '4.0.0', body: '## Highlights\n\nThe client was rewritten: `Configuration` and `OpenAIApi` were removed; use `new OpenAI()`.' },
+      ...Array.from({ length: 50 }, (_, i) => ({ title: `v4.${i + 1}.0`, url: `u4${i}`, version: `4.${i + 1}.0`, body: `## Features\n\n${'- a feature\n'.repeat(40)}` })),
+      { title: 'v7.0.0', url: 'u7', version: '7.0.0', body: '## Changes\n\n- Node 22 required' },
+      { title: 'Migration guide', url: 'g', body: guide, priorityFloor: 3, guide: true },
+    ];
+    const { text } = assembleNotes(blocks, 30_000);
+    expect(text).toContain('`OpenAIApi` were removed');
+    expect(text).toContain('Node 22 required');
+    expect(text).toContain('the v7 guide says');
   });
 });
