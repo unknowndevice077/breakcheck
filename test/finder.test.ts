@@ -121,8 +121,13 @@ describe('findUsages: the package itself as an import path', () => {
 
 describe('findUsages: file globs every project matches', () => {
   it('ignores package.json/lockfile globs instead of flagging every repo', () => {
-    const res = findUsages(root, 'react-router', [change('node-20', { kind: 'runtime', fileGlobs: ['package.json', '**/package-lock.json'] })]);
+    const res = findUsages(root, 'react-router', [
+      change('node-20', { kind: 'runtime', fileGlobs: ['package.json', '**/package-lock.json'] }),
+      change('broad', { kind: 'other', fileGlobs: ['**/*.{ts,tsx}', '*.js'] }),
+    ]);
     expect(res.hits.get('node-20')).toEqual([]);
+    expect(res.hits.get('broad')).toEqual([]);
+    expect(res.unanalysed).toEqual(expect.arrayContaining([expect.stringContaining('ignored file pattern `**/*.{ts,tsx}` (matches source files)')]));
     expect(res.unanalysed).toEqual(expect.arrayContaining([expect.stringContaining('ignored file pattern `package.json`')]));
   });
 });

@@ -160,6 +160,8 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Prom
 
   // What was searched and what came of it, for anyone reading the job log.
   log(`::group::${bump.name}: ${changes.length} breaking change(s), ${mode === 'ai' ? 'AI' : 'rule-based'}${fromCache ? ' (cached extraction)' : ''}`);
+  log(`notes: ${notes.sources.map((x) => `${x.kind} ${x.title}`).join(', ') || notes.missingReason || 'none'} (${notes.text.length} chars${notes.truncated ? ', truncated' : ''})`);
+  if (mode === 'ai') log(`safety net: ${extras.length} rule-based candidate(s) not covered by the AI, ${changes.filter((c) => c.id.startsWith('rules-')).length} matched new code`);
   for (const c of changes) {
     const searched = [...c.affectedSymbols.map((s) => `${s.type}:${s.name}`), ...c.searchPatterns.map((p) => `pattern:${p}`), ...c.fileGlobs.map((g) => `file:${g}`)];
     const found = (verification.verified.get(c.id) ?? []).map((h) => `${h.file}:${h.line}=${h.verdict}`);
