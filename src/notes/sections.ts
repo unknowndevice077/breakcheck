@@ -11,6 +11,15 @@ export interface Section {
 /** A single line that announces a breaking change (conventional-commit `!:`, BREAKING, removed, ...). */
 export const BREAKING_LINE = /BREAKING|\w!:|\bremoved?\b|\bno longer\b|\bdrop(?:ped|s)? support\b|\bdeprecat/i;
 
+/** A line of GitHub's auto-generated "What's Changed" list: "* title by @user in https://github.com/o/r/pull/123". */
+export const AUTO_PR_LINE = /\bby @[\w-]+(\[bot\])? in https:\/\/github\.com\/\S+\/pull\/\d+/;
+
+/** Mostly an auto-generated PR list (titles of merged PRs, rarely user-facing breaks). */
+export function isAutoPrList(text: string): boolean {
+  const bullets = text.split('\n').filter((l) => /^\s*[-*+]\s/.test(l));
+  return bullets.length >= 3 && bullets.filter((l) => AUTO_PR_LINE.test(l)).length / bullets.length >= 0.6;
+}
+
 export const PRIORITY_HEADING = /breaking|removed|removal|deprecat|migrat|upgrad|major changes|incompatib|⚠️|:warning:|drop(ped)? support/i;
 
 interface Line {
@@ -146,6 +155,7 @@ export function assembleNotes(blocks: NoteBlock[], budget: number): { text: stri
       if (!text) return;
       let priority = Math.max(isMajor ? 1 : 0, b.priorityFloor ?? 0);
       if (PRIORITY_HEADING.test(s.heading)) priority = 3;
+      else if (isAutoPrList(text)) priority = Math.min(priority, b.priorityFloor ?? 0);
       else if (BREAKING_LINE.test(text)) priority = Math.max(priority, 2);
       chunks.push({ block: bi, order: si, text, priority });
     });
@@ -190,7 +200,8 @@ export function condense(text: string, max: number): string {
   const keep = new Set<number>([0]);
   let size = (lines[0]?.length ?? 0) + marker.length + 2;
   const order = lines.map((l, i) => ({ l, i })).slice(1);
-  order.sort((a, b) => Number(BREAKING_LINE.test(b.l)) - Number(BREAKING_LINE.test(a.l)) || a.i - b.i);
+  const important = (l: string) => BREAKING_LINE.test(l) && !AUTO_PR_LINE.test(l);
+  order.sort((a, b) => Number(important(b.l)) - Number(important(a.l)) || a.i - b.i);
   for (const { l, i } of order) {
     if (size + l.length + 1 > max) continue;
     keep.add(i);

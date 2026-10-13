@@ -304,7 +304,11 @@ describe('specific outcomes', () => {
           { tag: 'v5.0.1', body: '## What\'s Changed\n* Update `cookie` semver lock to address CVE-2024-47764 by someone in #6016\n' },
           {
             tag: 'v5.0.0',
-            body: '## Breaking changes\n- Dropped support for Node.js versions before v18.\n- Deprecated APIs: old method signatures from Express v3 and v4 were removed.\n- Routing now uses path-to-regexp@8.x.\n\nSee the migration guide at https://expressjs.com/en/guide/migrating-5.html for all breaking changes.',
+            body:
+              '## Breaking changes\n- Dropped support for Node.js versions before v18.\n- Deprecated APIs: old method signatures from Express v3 and v4 were removed.\n- Routing now uses path-to-regexp@8.x.\n\nSee the migration guide at https://expressjs.com/en/guide/migrating-5.html for all breaking changes.\n\n' +
+              // GitHub's auto-generated list: ~400 PR titles, many containing "remove"
+              "## What's Changed\n" +
+              Array.from({ length: 400 }, (_, i) => `* ${i % 3 ? 'docs: update readme section' : 'remove unused test helper'} ${i} by @contributor${i} in https://github.com/expressjs/express/pull/${5000 + i}`).join('\n'),
           },
         ],
         tags: ['v5.0.1'],
@@ -344,7 +348,7 @@ describe('specific outcomes', () => {
   it('✅ next 14 → 15 with no affected code', async () => {
     const r = await execute(next('e2e/next/repo-clean'), { provider: 'anthropic', model: loadModel('next') });
     const body = commentBody(r.posted);
-    expect(body).toMatch(/^## ✅ No breaking changes found that affect your code \(5 checked\)$/m);
+    expect(body).toMatch(/^## ✅ No breaking changes found that affect your code \(5 checked, 1 can't be checked automatically\)$/m);
     expect(r.gateway.calls.map((c) => c.purpose)).toEqual(['extract next 14.2.15→15.0.0']); // verification skipped: no hits
     await expect(body).toMatchFileSnapshot('./__snapshots__/clean.md');
   });

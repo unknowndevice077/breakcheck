@@ -97,3 +97,16 @@ describe('identifiers', () => {
     expect(identifiers('```diff\n- import { json, defer } from "react-router";\n+ import { data } from "react-router";\n```', 'react-router', 10).map((i) => i.name)).toEqual(['json', 'defer']);
   });
 });
+
+describe('auto-generated "What\'s Changed" lists', () => {
+  it('are not treated as breaking changes unless explicitly marked', () => {
+    const notes = [
+      '=== Release v5.0.0 (https://x) ===',
+      "## What's Changed",
+      '* remove --bail from test script by @jonchurch in https://github.com/expressjs/express/pull/5962',
+      '* Remove Object.setPrototypeOf polyfill by @Phillip9587 in https://github.com/expressjs/express/pull/6081',
+      '* feat!: remove `app.del` by @someone in https://github.com/expressjs/express/pull/1',
+    ].join('\n');
+    expect(extractByRules(notes, 'express').breakingChanges.map((c) => c.affectedSymbols.map((s) => s.name))).toEqual([['app.del']]);
+  });
+});

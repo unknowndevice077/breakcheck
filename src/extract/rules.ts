@@ -1,5 +1,5 @@
 import type { AffectedSymbol, BreakingChange, ChangeKind, ExtractionResult, SymbolType } from '../types.js';
-import { BREAKING_LINE, PRIORITY_HEADING, splitSections } from '../notes/sections.js';
+import { AUTO_PR_LINE, BREAKING_LINE, PRIORITY_HEADING, splitSections } from '../notes/sections.js';
 import { normalizeExtraction } from './schema.js';
 
 /**
@@ -111,7 +111,10 @@ function releaseItems(body: string): { text: string; rank: number }[] {
         continue;
       }
       if (prioritySection) out.push({ text: b.lines.join('\n'), rank: 3 });
-      else if (BREAKING_LINE.test(head)) out.push({ text: b.lines.join('\n'), rank: 1 });
+      // Auto-generated "title by @user in …/pull/N" entries are PR titles; only explicit markers count.
+      else if (AUTO_PR_LINE.test(head)) {
+        if (/BREAKING|\w!:/.test(head)) out.push({ text: b.lines.join('\n'), rank: 1 });
+      } else if (BREAKING_LINE.test(head)) out.push({ text: b.lines.join('\n'), rank: 1 });
     }
   }
   return out;
