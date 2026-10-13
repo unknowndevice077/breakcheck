@@ -121,7 +121,18 @@ function diffBlock(h: VerifiedHit): string {
   return ['', `  Suggested fix for \`${h.file}:${h.line}\`:`, '', '  ```diff', ...[...minus, ...plus].map((l) => `  ${l}`), '  ```'].join('\n');
 }
 
-function changeSection(run: RunReport, p: PackageReport, c: ChangeReport): string {
+interface Limits {
+  /** Locations listed per change (rest summarised) */
+  hits: number;
+  /** Suggested diffs per change */
+  diffs: number;
+  /** Include every checked change in "All N checked", or only those with matches */
+  fullChecklist: boolean;
+}
+
+const FULL: Limits = { hits: Infinity, diffs: Infinity, fullChecklist: true };
+
+function changeSection(run: RunReport, p: PackageReport, c: ChangeReport, limits: Limits = FULL): string {
   const relevant = c.hits.filter((h) => h.verdict !== 'no');
   const definite = relevant.some(isAffected);
   const where = plural(relevant.length, 'location');
@@ -130,11 +141,16 @@ function changeSection(run: RunReport, p: PackageReport, c: ChangeReport): strin
     `<summary>${definite ? '⚠️' : '🟡'} <b>${p.bump.name}</b>: ${inlineHtml(c.change.summary)} (${where})</summary>`,
     '',
   ];
-  for (const h of relevant) {
+  let diffs = 0;
+  for (const h of relevant.slice(0, limits.hits)) {
     lines.push(hitLine(run, h));
-    const d = diffBlock(h);
-    if (d) lines.push(d);
+    const d = diffs < limits.diffs ? diffBlock(h) : '';
+    if (d) {
+      lines.push(d);
+      diffs++;
+    }
   }
+  if (relevant.length > limits.hits) lines.push(`- …and ${relevant.length - limits.hits} more location(s); see the job log`);
   const ruledOut = c.hits.filter((h) => h.verdict === 'no').length;
   if (ruledOut) lines.push(`- ${plural(ruledOut, 'other match', 'other matches')} checked and ruled out by the model`);
   const steps = c.change.migration.filter((m) => m !== c.change.summary);
@@ -144,8 +160,9 @@ function changeSection(run: RunReport, p: PackageReport, c: ChangeReport): strin
   return lines.join('\n');
 }
 
-function checkedList(p: PackageReport): string {
-  const rows = p.changes.map((c) => {
+function checkedList(p: PackageReport, full = true): string {
+  const shown = full ? p.changes : p.changes.filter((c) => c.hits.length);
+  const rows = shown.map((c) => {
     const status = c.hits.some(isAffected)
       ? 'affects this repo'
       : c.hits.some(isPossible)
@@ -158,54 +175,73 @@ function checkedList(p: PackageReport): string {
     const link = c.change.sourceUrl ? ` ([source](${c.change.sourceUrl}))` : '';
     return `- ${esc(c.change.summary)} — _${status}_${link}`;
   });
+  if (shown.length < p.changes.length) rows.push(`- …and ${p.changes.length - shown.length} more with no usages found`);
   return rows.join('\n');
 }
 
 export function renderComment(run: RunReport): string {
-  const t = tally(run);
-  const out: string[] = [MARKER, `## ${headline(run)}`, ''];
-  out.push('_breakcheck reads the release notes for each dependency bump in this PR and searches this repo for code the breaking changes touch._', '');
+  // Progressively compact until the comment fits GitHub's limit; never cut markup in half.
+  const levels: Limits[] = [FULL, { hits: 10, diffs: 3, fullChecklist: false }, { hits: 5, diffs: 1, fullChecklist: false }, { hits: 3, diffs: 0, fullChecklist: false }];
+  for (const limits of levels) {
+    const body = renderWith(run, limits, Infinity);
+    if (body.length <= MAX_COMMENT) return body;
+  }
+  return renderWith(run, levels[levels.length - 1]!, MAX_COMMENT);
+}
 
-  out.push('| Package | Version range | Breaking changes found | Affect you |', '| --- | --- | --- | --- |');
+function renderWith(run: RunReport, limits: Limits, maxLength: number): string {
+  const t = tally(run);
+  const head: string[] = [MARKER, `## ${headline(run)}`, ''];
+  head.push('_breakcheck reads the release notes for each dependency bump in this PR and searches this repo for code the breaking changes touch._', '');
+  head.push('| Package | Version range | Breaking changes found | Affect you |', '| --- | --- | --- | --- |');
   for (const p of run.packages) {
     const found = p.notes.missingReason && !p.changes.length ? '–' : String(p.changes.length);
-    out.push(`| ${packageLink(p.bump.name)} | ${p.bump.fromVersion} → ${p.bump.toVersion} (${p.bump.bumpType}) | ${found} | ${affectCell(p)} |`);
+    head.push(`| ${packageLink(p.bump.name)} | ${p.bump.fromVersion} → ${p.bump.toVersion} (${p.bump.bumpType}) | ${found} | ${affectCell(p)} |`);
   }
-  out.push('');
+  head.push('');
 
-  const sections: string[] = [];
+  const tail: string[] = [];
+  if (t.missing.length) {
+    tail.push('### Release notes not found', '');
+    for (const p of t.missing) tail.push(`- ${code(p.bump.name)} ${p.bump.fromVersion} → ${p.bump.toVersion}: ${esc(p.notes.missingReason ?? '')}. Review the upgrade manually.`);
+    tail.push('');
+  }
+  const detail: string[] = [];
+  for (const p of run.packages) {
+    if (!p.changes.length) continue;
+    detail.push(`**${p.bump.name}** (${p.mode === 'ai' ? 'AI-extracted' : 'rule-based, low confidence'}${p.fromCache ? ', cached' : ''}${p.notes.truncated ? ', notes truncated' : ''})`, '', checkedList(p, limits.fullChecklist), '');
+  }
+  if (detail.length && maxLength === Infinity) tail.push('<details>', `<summary>All ${plural(t.checked, 'breaking change')} checked</summary>`, '', ...detail, '</details>', '');
+  const notes = run.packages.flatMap((p) => p.unanalysed.map((u) => `- ${code(p.bump.name)}: ${esc(u)}`));
+  if (notes.length) {
+    const shown = maxLength === Infinity ? notes : notes.slice(0, 10);
+    tail.push('<details>', `<summary>Couldn't analyse (${notes.length})</summary>`, '', ...shown, ...(shown.length < notes.length ? [`- …and ${notes.length - shown.length} more`] : []), '', '</details>', '');
+  }
+  tail.push(modeLine(run), '', footer(run));
+
   const ordered = run.packages.flatMap((p) =>
     p.changes
       .filter((c) => c.hits.some((h) => isAffected(h) || isPossible(h)))
       .sort((a, b) => Number(b.hits.some(isAffected)) - Number(a.hits.some(isAffected)))
       .map((c) => ({ p, c })),
   );
-  for (const { p, c } of ordered) sections.push(changeSection(run, p, c));
-  if (sections.length) out.push('### What to look at', '', ...sections.flatMap((s) => [s, '']));
-
-  if (t.missing.length) {
-    out.push('### Release notes not found', '');
-    for (const p of t.missing) out.push(`- ${code(p.bump.name)} ${p.bump.fromVersion} → ${p.bump.toVersion}: ${esc(p.notes.missingReason ?? '')}. Review the upgrade manually.`);
-    out.push('');
+  const fixed = head.join('\n').length + tail.join('\n').length + 200;
+  const sections: string[] = [];
+  let size = fixed;
+  for (const { p, c } of ordered) {
+    const sec = changeSection(run, p, c, limits);
+    if (size + sec.length + 2 > maxLength) break;
+    sections.push(sec);
+    size += sec.length + 2;
   }
-
-  const detail: string[] = [];
-  for (const p of run.packages) {
-    if (!p.changes.length) continue;
-    detail.push(`**${p.bump.name}** (${p.mode === 'ai' ? 'AI-extracted' : 'rule-based, low confidence'}${p.fromCache ? ', cached' : ''}${p.notes.truncated ? ', notes truncated' : ''})`, '', checkedList(p), '');
+  const out = [...head];
+  if (sections.length || ordered.length) {
+    out.push('### What to look at', '', ...sections.flatMap((x) => [x, '']));
+    if (sections.length < ordered.length) {
+      out.push(`_…and ${ordered.length - sections.length} more affected change(s) not shown to fit GitHub's comment size limit. The job log lists every location._`, '');
+    }
   }
-  if (detail.length) out.push('<details>', `<summary>All ${plural(t.checked, 'breaking change')} checked</summary>`, '', ...detail, '</details>', '');
-
-  const notes = run.packages.flatMap((p) => p.unanalysed.map((u) => `- ${code(p.bump.name)}: ${esc(u)}`));
-  if (notes.length) out.push('<details>', `<summary>Couldn't analyse (${notes.length})</summary>`, '', ...notes, '', '</details>', '');
-
-  out.push(modeLine(run), '');
-  out.push(footer(run));
-  let body = out.join('\n');
-  if (body.length > MAX_COMMENT) {
-    body = body.slice(0, MAX_COMMENT) + `\n\n…comment truncated to fit GitHub's size limit. See the job summary for the full list.\n\n${footer(run)}`;
-  }
-  return body;
+  return [...out, ...tail].join('\n');
 }
 
 function footer(run: RunReport): string {
