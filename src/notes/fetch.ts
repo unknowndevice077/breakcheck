@@ -73,7 +73,7 @@ export async function gatherNotes(gh: GitHubApi, registry: Registry, bump: Bump,
       const content = await gh.getFile(owner, r, g, ref);
       if (!content) continue;
       const url = `https://github.com/${owner}/${r}/blob/${ref ?? 'HEAD'}/${g}`;
-      blocks.push({ title: `Migration guide ${g}`, url, body: content, priorityFloor: 2 });
+      blocks.push({ title: `Migration guide ${g}`, url, body: content, priorityFloor: 3 });
       sources.push({ kind: 'migration-guide', url, title: g });
       migrationLinks.delete(url);
     }
@@ -142,7 +142,7 @@ export function pickMigrationGuides(paths: string[], directory: string | undefin
   const scored: { p: string; score: number; base: number }[] = [];
   for (const p of paths) {
     if (!/\.mdx?$/i.test(p) || /(^|\/)(node_modules|test|tests|__tests__|fixtures|examples?)\//i.test(p) || /changelog/i.test(p)) continue;
-    let score = 0;
+    let score: number;
     if (MIGRATION_NAMES.test(p)) score = 5;
     else if (/migrat|upgrad/i.test(p)) {
       const stem = path.basename(p).replace(/\.mdx?$/i, '');
