@@ -195,6 +195,18 @@ CI runs lint, typecheck and tests, and fails if `dist/` doesn't match a fresh bu
 
 A second round on a Vue 3 app with a yarn berry lockfile (pinia 2 → 3, vue-i18n 9 → 11, [unknowndevice077/breakcheck#4](https://github.com/unknowndevice077/breakcheck/pull/4)) found `defineStore({ id })`, `allowComposition`, `i18n.global.tc` and every `$tc(...)`. That includes `$tc` in templates and in an Options API component that never imports vue-i18n. A planted `PiniaVuePlugin` import was not flagged, because pinia's v3 notes don't mention it.
 
+**Recall benchmark** ([unknowndevice077/breakcheck#5](https://github.com/unknowndevice077/breakcheck/pull/5)). The app was written against old versions of zod, commander, date-fns, @tanstack/query-core, openai and axios without reading their release notes. Each was upgraded by 1–4 majors, and `tsc` reported 17 errors at 20 broken code sites.
+
+| | Release notes only | With the type-check |
+| --- | --- | --- |
+| Compiler errors found | 0 of 17 | **17 of 17** |
+| Broken sites flagged or fixed by a suggested diff | 0 of 20 | **15 of 20** |
+| Wrong 🔴 | 1 | 1 |
+
+- **The 5 missed sites sit behind an earlier error.** The compiler reports only the first unknown property in an object, and calls through a failed import become untyped. Running `tsc` yourself behaves the same way: fixing the first error reveals the next.
+- **The wrong 🔴 is a commander change** ("`storeOptionsAsProperties()` after an option value now throws"). The benchmark code does throw, but it already threw with the old version.
+- **Release notes alone found almost nothing for long ranges** like openai 3→7 and zod 3→4. The important release was crowded out, or the wrong migration guide was read. Both are fixed, but the compiler is what makes compile-level recall reliable.
+
 To try it on a real repo, see [`examples/`](examples/).
 
 ## License
