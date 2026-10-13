@@ -125,13 +125,30 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Prom
     }
     if (mode === 'rules') extraction = extractByRules(notes.text, bump.name);
   }
-  const changes: BreakingChange[] = extraction.breakingChanges;
+  let changes: BreakingChange[] = extraction.breakingChanges;
+  // Safety net: a model can skip a change that is plainly in the notes. Rule-based
+  // candidates it did not cover are searched too; only those that match code survive,
+  // and the AI verification step still judges them.
+  const extras = mode === 'ai' && notes.text ? ruleSupplement(changes, extractByRules(notes.text, bump.name).breakingChanges) : [];
 
   // Usage search (deterministic) and verification (AI only)
   let hits = new Map<string, UsageHit[]>();
   try {
-    const found = findUsages(deps.workspace, bump.name, changes);
+    const found = findUsages(deps.workspace, bump.name, [...changes, ...extras]);
     hits = found.hits;
+    if (extras.length) {
+      const seen = new Set(changes.flatMap((c) => (hits.get(c.id) ?? []).map((h) => `${h.file}:${h.line}`)));
+      for (const x of extras) {
+        const fresh = (hits.get(x.id) ?? []).filter((h) => !seen.has(`${h.file}:${h.line}`));
+        if (!fresh.length) {
+          hits.delete(x.id);
+          continue;
+        }
+        fresh.forEach((h) => seen.add(`${h.file}:${h.line}`));
+        hits.set(x.id, fresh);
+        changes = [...changes, x];
+      }
+    }
     unanalysed.push(...found.unanalysed);
     if (!found.importingFiles.length && changes.length) unanalysed.push(`no source file imports ${bump.name} (config files and scripts were still checked)`);
   } catch (e) {
@@ -150,6 +167,22 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Prom
     unanalysed,
     fromCache,
   };
+}
+
+/**
+ * Rule-based changes whose symbols or file globs the AI extraction did not mention.
+ * Ids are prefixed so they never collide with the model's.
+ */
+export function ruleSupplement(ai: BreakingChange[], rules: BreakingChange[]): BreakingChange[] {
+  const covered = new Set(ai.flatMap((c) => c.affectedSymbols.map((s) => s.name.toLowerCase())));
+  const out: BreakingChange[] = [];
+  for (const r of rules) {
+    const affectedSymbols = r.affectedSymbols.filter((s) => !covered.has(s.name.toLowerCase()));
+    const searchPatterns = r.searchPatterns.filter((p) => !covered.has(p.toLowerCase()));
+    if (!affectedSymbols.length && !searchPatterns.length && !r.fileGlobs.length) continue;
+    out.push({ ...r, id: `rules-${r.id}`, affectedSymbols, searchPatterns, confidence: 'low' });
+  }
+  return out;
 }
 
 /** A view of the gateway that reports itself unavailable, so verification runs in rule-based mode. */

@@ -7,8 +7,14 @@
         "kind": "config",
         "affectedSymbols": [],
         "searchPatterns": [],
-        "fileGlobs": [".eslintrc", ".eslintrc.*"],
-        "migration": ["Convert the config with `npx @eslint/migrate-config .eslintrc.json`.", "Or set `ESLINT_USE_FLAT_CONFIG=false` temporarily (deprecated)."],
+        "fileGlobs": [
+          ".eslintrc",
+          ".eslintrc.*"
+        ],
+        "migration": [
+          "Convert the config with `npx @eslint/migrate-config .eslintrc.json`.",
+          "Or set `ESLINT_USE_FLAT_CONFIG=false` temporarily (deprecated)."
+        ],
         "sourceUrl": "https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md",
         "confidence": "high"
       },
@@ -16,10 +22,17 @@
         "id": "ext-flag-removed",
         "summary": "The `--ext` CLI flag is not supported with flat config; file patterns come from the config's `files`.",
         "kind": "cli",
-        "affectedSymbols": [{ "name": "--ext", "type": "cli-flag" }],
+        "affectedSymbols": [
+          {
+            "name": "--ext",
+            "type": "cli-flag"
+          }
+        ],
         "searchPatterns": [],
         "fileGlobs": [],
-        "migration": ["Drop `--ext` and add `files: ['**/*.js', '**/*.ts']` to the relevant config object."],
+        "migration": [
+          "Drop `--ext` and add `files: ['**/*.js', '**/*.ts']` to the relevant config object."
+        ],
         "sourceUrl": "https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md",
         "confidence": "medium"
       },
@@ -28,9 +41,13 @@
         "summary": "The checkstyle, compact, jslint-xml, junit, tap, unix and visualstudio formatters were removed from core.",
         "kind": "cli",
         "affectedSymbols": [],
-        "searchPatterns": ["/--format[= ](checkstyle|compact|jslint-xml|junit|tap|unix|visualstudio)\\b/"],
+        "searchPatterns": [
+          "/--format[= ](checkstyle|compact|jslint-xml|junit|tap|unix|visualstudio)\\b/"
+        ],
         "fileGlobs": [],
-        "migration": ["Install the standalone package, e.g. `eslint-formatter-compact`, and keep `--format compact`."],
+        "migration": [
+          "Install the standalone package, e.g. `eslint-formatter-compact`, and keep `--format compact`."
+        ],
         "sourceUrl": "https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md",
         "confidence": "high"
       },
@@ -38,10 +55,21 @@
         "id": "jsdoc-rules-removed",
         "summary": "The `require-jsdoc` and `valid-jsdoc` rules were removed.",
         "kind": "removed",
-        "affectedSymbols": [{ "name": "require-jsdoc", "type": "config-key" }, { "name": "valid-jsdoc", "type": "config-key" }],
+        "affectedSymbols": [
+          {
+            "name": "require-jsdoc",
+            "type": "config-key"
+          },
+          {
+            "name": "valid-jsdoc",
+            "type": "config-key"
+          }
+        ],
         "searchPatterns": [],
         "fileGlobs": [],
-        "migration": ["Remove the rules, or use `eslint-plugin-jsdoc` equivalents."],
+        "migration": [
+          "Remove the rules, or use `eslint-plugin-jsdoc` equivalents."
+        ],
         "sourceUrl": "https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md",
         "confidence": "high"
       },
@@ -49,10 +77,17 @@
         "id": "no-unused-vars-caught-errors",
         "summary": "`no-unused-vars` now defaults `caughtErrors` to \"all\".",
         "kind": "behavior",
-        "affectedSymbols": [{ "name": "no-unused-vars", "type": "config-key" }],
+        "affectedSymbols": [
+          {
+            "name": "no-unused-vars",
+            "type": "config-key"
+          }
+        ],
         "searchPatterns": [],
         "fileGlobs": [],
-        "migration": ["Set `caughtErrors: \"none\"` to keep the v8 behaviour, or prefix unused catch params with `_` and set `caughtErrorsIgnorePattern`."],
+        "migration": [
+          "Set `caughtErrors: \"none\"` to keep the v8 behaviour, or prefix unused catch params with `_` and set `caughtErrorsIgnorePattern`."
+        ],
         "sourceUrl": "https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md",
         "confidence": "high"
       },
@@ -63,7 +98,9 @@
         "affectedSymbols": [],
         "searchPatterns": [],
         "fileGlobs": [],
-        "migration": ["Use Node.js ^18.18.0, ^20.9.0 or >=21.1.0."],
+        "migration": [
+          "Use Node.js ^18.18.0, ^20.9.0 or >=21.1.0."
+        ],
         "sourceUrl": "https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md",
         "confidence": "high"
       }
@@ -78,7 +115,10 @@
     "ext-flag-removed@package.json:5": {
       "affected": "yes",
       "reason": "The `lint` script passes `--ext`, which errors under flat config.",
-      "fix": { "before": "    \"lint\": \"eslint --ext .js,.ts --format compact src\",", "after": "    \"lint\": \"eslint --format compact src\"," }
+      "fix": {
+        "before": "    \"lint\": \"eslint --ext .js,.ts --format compact src\",",
+        "after": "    \"lint\": \"eslint --format compact src\","
+      }
     },
     "formatters-removed@package.json:5": {
       "affected": "yes",
@@ -88,11 +128,19 @@
     "jsdoc-rules-removed@.eslintrc.json:6": {
       "affected": "yes",
       "reason": "Enables `valid-jsdoc`, which no longer exists.",
-      "fix": { "before": "    \"valid-jsdoc\": \"warn\",", "after": "" }
+      "fix": {
+        "before": "    \"valid-jsdoc\": \"warn\",",
+        "after": ""
+      }
     },
     "no-unused-vars-caught-errors@.eslintrc.json:7": {
       "affected": "unsure",
       "reason": "The rule is enabled without `caughtErrors`, so unused catch parameters will start to be reported; depends on the code.",
+      "fix": null
+    },
+    "rules-eslint-recommended@.eslintrc.json:3": {
+      "affected": "no",
+      "reason": "String presets are only rejected inside flat config arrays; this is a legacy .eslintrc file.",
       "fix": null
     }
   }
