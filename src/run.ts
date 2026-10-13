@@ -72,9 +72,11 @@ export async function run(ctx: RunContext, deps: RunDeps, opts: RunOptions): Pro
   for (const b of bumps.slice(opts.maxPackages)) skipped.push({ name: b.name, reason: `over the max-packages limit (${opts.maxPackages})` });
 
   const packages: PackageReport[] = [];
+  // Per run: packages released together (react, react-dom) share notes and one extraction.
+  const extractionMemo = new Map<string, Promise<ExtractionResult>>();
   for (const bump of selected) {
     log(`Analysing ${bump.name} ${bump.fromVersion} → ${bump.toVersion} (${bump.bumpType})`);
-    packages.push(await analysePackage(bump, deps, opts));
+    packages.push(await analysePackage(bump, deps, opts, extractionMemo));
   }
 
   const report: RunReport = {
@@ -91,7 +93,18 @@ export async function run(ctx: RunContext, deps: RunDeps, opts: RunOptions): Pro
   return { report, body, comment, affected: t.affected, possible: t.possible };
 }
 
-async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Promise<PackageReport> {
+/**
+ * Models sometimes invent source links (seen: github.com/react/react for facebook/react).
+ * Keep a link only if it points into a document we actually fetched; otherwise use the
+ * first source we fetched.
+ */
+export function checkSourceUrl(url: string | null, notes: ReleaseNotes): string | null {
+  const known = notes.sources.map((x) => x.url.split('#')[0] ?? x.url);
+  if (url && known.some((k) => url.split('#')[0] === k || url.startsWith(`${k}#`))) return url;
+  return notes.sources[0]?.url ?? null;
+}
+
+async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions, extractionMemo: Map<string, Promise<ExtractionResult>>): Promise<PackageReport> {
   const { gateway } = deps;
   const log = deps.log ?? (() => {});
   const unanalysed: string[] = [];
@@ -116,7 +129,19 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Prom
         fromCache = true;
       } else {
         try {
-          extraction = await extractWithAI(gateway, bump, notes);
+          // react and react-dom ship the same release notes: extract once per run.
+          const memoKey = `${gateway.label}\n${notes.text}`;
+          const memo = extractionMemo.get(memoKey);
+          if (memo) {
+            extraction = await memo;
+            log(`${bump.name}: same release notes as an earlier package, reusing its extraction`);
+          } else {
+            const pending = extractWithAI(gateway, bump, notes);
+            extractionMemo.set(memoKey, pending);
+            pending.catch(() => extractionMemo.delete(memoKey));
+            extraction = await pending;
+          }
+          extraction = { breakingChanges: extraction.breakingChanges.map((c) => ({ ...c, sourceUrl: checkSourceUrl(c.sourceUrl, notes) })) };
           await deps.cache.set(key, extraction);
         } catch (e) {
           mode = 'rules';
@@ -151,6 +176,7 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Prom
       }
     }
     unanalysed.push(...found.unanalysed);
+    for (const d of found.diagnostics) log(`  note: ${d}`);
     if (!found.importingFiles.length && changes.length) unanalysed.push(`no source file imports ${bump.name} (config files and scripts were still checked)`);
   } catch (e) {
     unanalysed.push(`usage search failed: ${(e as Error).message}`);
@@ -193,7 +219,16 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Prom
  * Ids are prefixed so they never collide with the model's.
  */
 export function ruleSupplement(ai: BreakingChange[], rules: BreakingChange[]): BreakingChange[] {
-  const covered = new Set(ai.flatMap((c) => c.affectedSymbols.map((s) => s.name.toLowerCase())));
+  // `NextRequest` is covered by an AI symbol `NextRequest.geo`; `geo` by `request.geo`.
+  const covered = new Set(
+    ai.flatMap((c) =>
+      c.affectedSymbols.flatMap((s) => {
+        const n = s.name.toLowerCase().replace('#', '.');
+        const parts = n.split('.');
+        return [n, ...(parts.length > 1 ? [parts.slice(0, -1).join('.'), parts.at(-1) ?? n] : [])];
+      }),
+    ),
+  );
   const out: BreakingChange[] = [];
   for (const r of rules) {
     const affectedSymbols = r.affectedSymbols.filter((s) => !covered.has(s.name.toLowerCase()));

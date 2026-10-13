@@ -126,6 +126,13 @@ describe('findUsages: receivers named after the package', () => {
   });
 });
 
+describe('findUsages: members of imported classes', () => {
+  it('NextRequest.geo matches request.geo on an instance of the imported type', () => {
+    const res = findUsages(root, 'next', [change('geo', { affectedSymbols: [{ name: 'NextRequest.geo', type: 'member' }] })]);
+    expect(where(res.hits.get('geo'))).toEqual(['src/geo.ts:4']);
+  });
+});
+
 describe('findUsages: module-format changes', () => {
   it('"now ESM-only" matches exactly the require() calls of the package', () => {
     const res = findUsages(root, 'react-router', [
@@ -143,8 +150,9 @@ describe('findUsages: file globs every project matches', () => {
     ]);
     expect(res.hits.get('node-20')).toEqual([]);
     expect(res.hits.get('broad')).toEqual([]);
-    expect(res.unanalysed).toEqual(expect.arrayContaining([expect.stringContaining('ignored file pattern `**/*.{ts,tsx}` (matches source files)')]));
-    expect(res.unanalysed).toEqual(expect.arrayContaining([expect.stringContaining('ignored file pattern `package.json`')]));
+    expect(res.diagnostics).toEqual(expect.arrayContaining([expect.stringContaining('ignored file pattern `**/*.{ts,tsx}` (matches source files)')]));
+    expect(res.diagnostics).toEqual(expect.arrayContaining([expect.stringContaining('ignored file pattern `package.json`')]));
+    expect(res.unanalysed.join(' ')).not.toContain('ignored file pattern');
   });
 });
 

@@ -22,6 +22,16 @@ export interface VerifyOutcome {
   error?: string;
 }
 
+/** A suggested diff is only shown if its "before" really is code from the snippet (gutter stripped, whitespace-insensitive). */
+export function fixMatchesSnippet(before: string, snippet: string): boolean {
+  const flat = (t: string) => t.replace(/\s+/g, ' ').trim();
+  const code = snippet
+    .split('\n')
+    .map((l) => l.replace(/^[> ] *\d+ \| ?/, ''))
+    .join('\n');
+  return flat(code).includes(flat(before));
+}
+
 function possibly(hit: UsageHit, why: string): VerifiedHit {
   return { ...hit, verdict: 'possibly', reason: why, fix: null };
 }
@@ -100,7 +110,7 @@ export async function verifyHits(gw: ModelGateway, bump: Bump, changes: Breaking
           results.set(hit.id, { ...hit, verdict: 'unsure', reason: 'The model returned no verdict for this location', fix: null });
           continue;
         }
-        const fix = r.fix && r.fix.before.trim() && r.fix.after !== r.fix.before ? r.fix : null;
+        const fix = r.fix && r.fix.before.trim() && r.fix.after !== r.fix.before && fixMatchesSnippet(r.fix.before, hit.snippet) ? r.fix : null;
         results.set(hit.id, { ...hit, verdict: r.affected, reason: r.reason.trim(), fix: r.affected === 'yes' ? fix : null });
       }
     }
