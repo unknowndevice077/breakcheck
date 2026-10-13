@@ -7,6 +7,7 @@ const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/;
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache', 'vendor', '.yarn', '.pnpm-store']);
 const MAX_FILE_BYTES = 1_000_000;
 const MAX_FILES = 20_000;
+const SAMPLE_SOURCE_FILES = ['src/index.ts', 'src/App.tsx', 'src/index.js', 'src/App.jsx', 'src/index.mjs', 'src/index.cjs'];
 const UBIQUITOUS_FILES = ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock', 'README.md', 'tsconfig.json', '.gitignore'];
 /** Receiver names with a fixed conventional meaning (Express/Koa/Fetch style). */
 const CONVENTIONAL_RECEIVERS = new Set(['req', 'res', 'app', 'router', 'request', 'response', 'ctx', 'next']);
@@ -385,6 +386,11 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
       // A glob matching files every project has (package.json, lockfiles) says nothing about usage.
       if (UBIQUITOUS_FILES.some((f) => re.test(f))) {
         unanalysed.push(`${change.id}: ignored file pattern \`${g}\` (matches files every project has)`);
+        continue;
+      }
+      // Source files are searched for symbols; their mere existence proves nothing.
+      if (SAMPLE_SOURCE_FILES.some((f) => re.test(f) || re.test(path.posix.basename(f)))) {
+        unanalysed.push(`${change.id}: ignored file pattern \`${g}\` (matches source files)`);
         continue;
       }
       for (const f of files) if (re.test(path.posix.basename(f)) || re.test(f)) add(change, f, 1, 'file', g);
