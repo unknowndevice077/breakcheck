@@ -18,8 +18,9 @@ On every pull request that touches `package.json` or a lockfile, breakcheck:
 2. **Reads the release notes for exactly that range.** It finds the GitHub repo through the npm registry and reads GitHub Releases, falling back to `CHANGELOG.md`/`History.md` at the tag. For major bumps it also reads the migration guide. Monorepo tags such as `pkg@1.2.3` and `pkg-v1.2.3` are handled.
 3. **Extracts the breaking changes** as structured data: affected exports, options, CLI flags and config keys, plus migration steps.
 4. **Finds usages deterministically** with the TypeScript compiler (ts-morph). Aliased, default, namespace, `require()` and dynamic imports are resolved, and config files and `package.json` scripts are searched too.
-5. **Verifies each hit** with a model that sees only a ±10-line snippet, then gives a yes/no/unsure verdict and a suggested fix.
-6. **Posts one comment** and updates it in place on every re-run. The comment shows a headline, a per-package table, one collapsible section per affected change with `file:line` links, the mode that produced the result, and what was and wasn't checked.
+5. **Type-checks the upgrade** (TypeScript projects). It downloads the old and new version of the package from the npm registry, type-checks the files that import it against each, and reports every error that only the new version produces. This finds compile-level breaks even when the release notes never mention them, confirms note-based matches the compiler rejects, and rules out "removed export" claims for names that still exist.
+6. **Verifies each hit** with a model that sees only a ±10-line snippet, then gives a yes/no/unsure verdict and a suggested fix.
+7. **Posts one comment** and updates it in place on every re-run. The comment shows a headline, a per-package table, one collapsible section per affected change with `file:line` links, the mode that produced the result, and what was and wasn't checked.
 
 It never says an upgrade is "safe". It says what it checked.
 
@@ -107,6 +108,7 @@ PRs from forks get a read-only token that `permissions:` cannot raise, so breakc
 - Secret-bearing files (`.env*`, `.npmrc`, `.yarnrc*`, key and credential files) are never read.
 - Token-shaped strings in snippets are replaced with `[redacted]` before they leave the runner. This covers API keys, GitHub/AWS/Slack/Google tokens, JWTs, private keys, and values assigned to `password`/`token`/`apiKey`-like names.
 - With `copilot`, the CLI runs in an empty temporary directory, with shell and write tools denied and only the token in its environment. The only thing it receives is the prompt.
+- The type-check runs on the runner. It downloads the bumped packages' tarballs from your npm registry (`npm_config_registry`) and sends nothing anywhere.
 - Snippets go to the provider you chose, under that provider's terms (GitHub Copilot, Anthropic or OpenAI).
 
 ## Inputs
@@ -120,6 +122,7 @@ PRs from forks get a read-only token that `permissions:` cannot raise, so breakc
 | `include-patch` | `false` | Also analyse `x.y.Z` bumps |
 | `max-packages` | `10` | Packages per run, majors first |
 | `fail-on-affected` | `false` | Fail the check when anything is affected or possibly affected |
+| `typecheck` | `true` | Type-check importing TypeScript files against the old and new type declarations |
 | `copilot-cli-version` | `1.0.96` | Version of `@github/copilot` to run |
 
 Outputs: `affected-count`, `possibly-affected-count`, `mode` (`ai`/`rules`/`mixed`), `comment-url`.
@@ -141,6 +144,7 @@ Outputs: `affected-count`, `possibly-affected-count`, `mode` (`ai`/`rules`/`mixe
 
 - **JavaScript/TypeScript with npm, pnpm or yarn only.** Only direct dependencies are analysed.
 - **Vue, Svelte and Astro components** are searched through their `<script>` blocks (and Astro frontmatter). Template expressions are only covered by text patterns, not by symbol search.
+- **The type-check sees compile-level breaks only.** It covers `.ts`/`.tsx` files that import the package, with the repo's `tsconfig.json` options. Other dependencies aren't installed, so their types are `any`; that can hide an error but never invents one. Packages typed by `@types/*` are checked when the `@types/*` package itself is bumped. Behaviour changes that still compile rely on the release notes.
 - **Usage search is static.** Instance members such as `res.json` are matched by property name in files that import the package, so the AI step or a human needs to confirm them. Values passed around through variables, `eval` and string-built imports are not followed.
 - **The finder only sees what the release notes say.** If a project doesn't document a break, breakcheck can't know about it. Projects without GitHub releases or a changelog get the ❓ headline.
   - Example: ESLint 9 rejects `--ext` under flat config, but neither the v9 release notes nor the v9 migration guide name the flag. breakcheck flags your `.eslintrc*` file, not the `--ext` in your scripts.
