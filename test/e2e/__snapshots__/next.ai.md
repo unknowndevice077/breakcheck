@@ -10,7 +10,7 @@ _breakcheck reads the release notes for each dependency bump in this PR and sear
 ### What to look at
 
 <details>
-<summary>⚠️ <b>next</b>: `cookies()`, `headers()` and `draftMode()` are now async and must be awaited. (1 location)</summary>
+<summary>⚠️ <b>next</b>: <code>cookies()</code>, <code>headers()</code> and <code>draftMode()</code> are now async and must be awaited. (1 location)</summary>
 
 - 🔴 [app/page.tsx:4](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/page.tsx#L4): Calls `cookies().get()` synchronously; in 15 `cookies()` returns a promise (make `Page` async).
 
@@ -32,7 +32,7 @@ Source: https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-y
 </details>
 
 <details>
-<summary>⚠️ <b>next</b>: `runtime = 'experimental-edge'` is no longer accepted; use `'edge'`. (1 location)</summary>
+<summary>⚠️ <b>next</b>: <code>runtime = 'experimental-edge'</code> is no longer accepted; use <code>'edge'</code>. (1 location)</summary>
 
 - 🔴 [app/api/geo/route.ts:3](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/api/geo/route.ts#L3): Declares the removed `experimental-edge` runtime.
 
@@ -52,7 +52,7 @@ Source: https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-y
 </details>
 
 <details>
-<summary>⚠️ <b>next</b>: `NextRequest` no longer has `geo` and `ip`; these come from your hosting provider. (1 location)</summary>
+<summary>⚠️ <b>next</b>: <code>NextRequest</code> no longer has <code>geo</code> and <code>ip</code>; these come from your hosting provider. (1 location)</summary>
 
 - 🔴 [app/api/geo/route.ts:6](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/api/geo/route.ts#L6): Reads `request.geo`, which is undefined in Next.js 15.
 

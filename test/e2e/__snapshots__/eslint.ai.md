@@ -10,7 +10,7 @@ _breakcheck reads the release notes for each dependency bump in this PR and sear
 ### What to look at
 
 <details>
-<summary>⚠️ <b>eslint</b>: `eslint.config.js` (flat config) is the default; `.eslintrc.*` files are no longer read. (1 location)</summary>
+<summary>⚠️ <b>eslint</b>: <code>eslint.config.js</code> (flat config) is the default; <code>.eslintrc.*</code> files are no longer read. (1 location)</summary>
 
 - 🔴 [.eslintrc.json:1](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/.eslintrc.json#L1): The repo is configured with `.eslintrc.json`, which ESLint 9 ignores by default.
 
@@ -24,7 +24,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 </details>
 
 <details>
-<summary>⚠️ <b>eslint</b>: The `--ext` CLI flag is not supported with flat config; file patterns come from the config's `files`. (1 location)</summary>
+<summary>⚠️ <b>eslint</b>: The <code>--ext</code> CLI flag is not supported with flat config; file patterns come from the config's <code>files</code>. (1 location)</summary>
 
 - 🔴 [package.json:5](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/package.json#L5): The `lint` script passes `--ext`, which errors under flat config.
 
@@ -57,7 +57,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 </details>
 
 <details>
-<summary>⚠️ <b>eslint</b>: The `require-jsdoc` and `valid-jsdoc` rules were removed. (1 location)</summary>
+<summary>⚠️ <b>eslint</b>: The <code>require-jsdoc</code> and <code>valid-jsdoc</code> rules were removed. (1 location)</summary>
 
 - 🔴 [.eslintrc.json:6](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/.eslintrc.json#L6): Enables `valid-jsdoc`, which no longer exists.
 
@@ -76,7 +76,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 </details>
 
 <details>
-<summary>🟡 <b>eslint</b>: `no-unused-vars` now defaults `caughtErrors` to "all". (1 location)</summary>
+<summary>🟡 <b>eslint</b>: <code>no-unused-vars</code> now defaults <code>caughtErrors</code> to "all". (1 location)</summary>
 
 - 🟡 [.eslintrc.json:7](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/.eslintrc.json#L7) _(unsure)_: The rule is enabled without `caughtErrors`, so unused catch parameters will start to be reported; depends on the code.
 

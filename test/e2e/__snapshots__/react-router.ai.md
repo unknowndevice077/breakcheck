@@ -10,7 +10,7 @@ _breakcheck reads the release notes for each dependency bump in this PR and sear
 ### What to look at
 
 <details>
-<summary>⚠️ <b>react-router</b>: The `json` and `defer` utilities were removed; return plain objects, or `data()` when you need a status or headers. (3 locations)</summary>
+<summary>⚠️ <b>react-router</b>: The <code>json</code> and <code>defer</code> utilities were removed; return plain objects, or <code>data()</code> when you need a status or headers. (3 locations)</summary>
 
 - 🔴 [app/routes/account.tsx:1](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/routes/account.tsx#L1): Imports `defer` and `json`, which no longer exist in v7.
 
@@ -47,7 +47,7 @@ Source: https://github.com/remix-run/react-router/releases/tag/react-router%407.
 </details>
 
 <details>
-<summary>⚠️ <b>react-router</b>: `react-router-dom` was collapsed into `react-router`; import from `react-router` (and `react-router/dom` for `RouterProvider`). (1 location)</summary>
+<summary>⚠️ <b>react-router</b>: <code>react-router-dom</code> was collapsed into <code>react-router</code>; import from <code>react-router</code> (and <code>react-router/dom</code> for <code>RouterProvider</code>). (1 location)</summary>
 
 - 🔴 [app/root.tsx:1](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/root.tsx#L1): Imports from `react-router-dom`, which is no longer the v7 entry point.
 
@@ -69,7 +69,7 @@ Source: https://github.com/remix-run/react-router/blob/react-router@7.1.0/docs/u
 </details>
 
 <details>
-<summary>⚠️ <b>react-router</b>: All v6 `future.v7_*` flags were removed; their behaviour is now the default. (1 location)</summary>
+<summary>⚠️ <b>react-router</b>: All v6 <code>future.v7_*</code> flags were removed; their behaviour is now the default. (1 location)</summary>
 
 - 🔴 [app/root.tsx:7](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/root.tsx#L7): Passes `future={{ v7_startTransition: true }}`; the flag no longer exists and the prop no longer type-checks.
 

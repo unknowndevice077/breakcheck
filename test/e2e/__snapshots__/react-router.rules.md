@@ -10,7 +10,7 @@ _breakcheck reads the release notes for each dependency bump in this PR and sear
 ### What to look at
 
 <details>
-<summary>🟡 <b>react-router</b>: Remove the original `defer` implementation in favor of using raw promises via single fetch and `turbo-stream`. This removes these exports from React Router (2 locations)</summary>
+<summary>🟡 <b>react-router</b>: Remove the original <code>defer</code> implementation in favor of using raw promises via single fetch and <code>turbo-stream</code>. This removes these exports from React Router (2 locations)</summary>
 
 - 🟡 [app/routes/account.tsx:1](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/routes/account.tsx#L1) _(possibly)_: Uses `defer`
 - 🟡 [app/routes/account.tsx:9](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/routes/account.tsx#L9) _(possibly)_: Uses `defer`
@@ -20,7 +20,7 @@ Source: https://github.com/remix-run/react-router/releases/tag/react-router%407.
 </details>
 
 <details>
-<summary>🟡 <b>react-router</b>: Collapse `@remix-run/router` into `react-router` (1 location)</summary>
+<summary>🟡 <b>react-router</b>: Collapse <code>@remix-run/router</code> into <code>react-router</code> (1 location)</summary>
 
 - 🟡 [app/root.tsx:1](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/root.tsx#L1) _(possibly)_: Uses `react-router-dom`
 
@@ -29,7 +29,7 @@ Source: https://github.com/remix-run/react-router/releases/tag/react-router%407.
 </details>
 
 <details>
-<summary>🟡 <b>react-router</b>: Remove `future.v7_startTransition` flag (2 locations)</summary>
+<summary>🟡 <b>react-router</b>: Remove <code>future.v7_startTransition</code> flag (2 locations)</summary>
 
 - 🟡 [app/root.tsx:7](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/root.tsx#L7) _(possibly)_: Uses `v7_startTransition`
 - 🟡 [app/routes/home.tsx:3](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/routes/home.tsx#L3) _(possibly)_: Uses `v7_startTransition`
@@ -55,7 +55,7 @@ Source: https://github.com/remix-run/react-router/blob/react-router@7.1.0/docs/u
 </details>
 
 <details>
-<summary>🟡 <b>react-router</b>: Remove the deprecated `json` utility (2 locations)</summary>
+<summary>🟡 <b>react-router</b>: Remove the deprecated <code>json</code> utility (2 locations)</summary>
 
 - 🟡 [app/routes/account.tsx:1](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/routes/account.tsx#L1) _(possibly)_: Uses `json`
 - 🟡 [app/routes/account.tsx:7](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/routes/account.tsx#L7) _(possibly)_: Uses `json`

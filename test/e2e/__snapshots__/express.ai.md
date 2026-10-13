@@ -10,7 +10,7 @@ _breakcheck reads the release notes for each dependency bump in this PR and sear
 ### What to look at
 
 <details>
-<summary>⚠️ <b>express</b>: `app.del()` was removed; use `app.delete()`. (1 location)</summary>
+<summary>⚠️ <b>express</b>: <code>app.del()</code> was removed; use <code>app.delete()</code>. (1 location)</summary>
 
 - 🔴 [src/server.js:20](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L20): Registers a route with the removed `app.del`.
 
@@ -30,7 +30,7 @@ Source: https://github.com/expressjs/express/blob/v5.0.1/History.md
 </details>
 
 <details>
-<summary>⚠️ <b>express</b>: `req.param(name)` was removed; read `req.params`, `req.body` or `req.query` explicitly. (1 location)</summary>
+<summary>⚠️ <b>express</b>: <code>req.param(name)</code> was removed; read <code>req.params</code>, <code>req.body</code> or <code>req.query</code> explicitly. (1 location)</summary>
 
 - 🔴 [src/server.js:16](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L16): `req.param('id')` no longer exists; the value is a route parameter.
 
@@ -50,7 +50,7 @@ Source: https://github.com/expressjs/express/blob/v5.0.1/History.md
 </details>
 
 <details>
-<summary>⚠️ <b>express</b>: `res.sendfile()` was removed; use `res.sendFile()` (absolute path or `root` option). (1 location)</summary>
+<summary>⚠️ <b>express</b>: <code>res.sendfile()</code> was removed; use <code>res.sendFile()</code> (absolute path or <code>root</code> option). (1 location)</summary>
 
 - 🔴 [src/server.js:25](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L25): Calls the removed lowercase `res.sendfile`.
 
@@ -70,7 +70,7 @@ Source: https://github.com/expressjs/express/blob/v5.0.1/History.md
 </details>
 
 <details>
-<summary>⚠️ <b>express</b>: `res.json(obj, status)` and `res.json(status, obj)` signatures were removed; set the status with `res.status()`. (1 location)</summary>
+<summary>⚠️ <b>express</b>: <code>res.json(obj, status)</code> and <code>res.json(status, obj)</code> signatures were removed; set the status with <code>res.status()</code>. (1 location)</summary>
 
 - 🔴 [src/server.js:12](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L12): Passes the status as a second argument, which v5 no longer accepts.
 

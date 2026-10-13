@@ -26,7 +26,7 @@ Source: https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-y
 </details>
 
 <details>
-<summary>🟡 <b>next</b>: `NextRequest` Geolocation (2 locations)</summary>
+<summary>🟡 <b>next</b>: <code>NextRequest</code> Geolocation (2 locations)</summary>
 
 - 🟡 [app/api/geo/route.ts:1](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/api/geo/route.ts#L1) _(possibly)_: Uses `NextRequest`
 - 🟡 [app/api/geo/route.ts:5](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/app/api/geo/route.ts#L5) _(possibly)_: Uses `NextRequest`
