@@ -1,0 +1,95 @@
+{
+  "extraction": {
+    "breakingChanges": [
+      {
+        "id": "json-defer-removed",
+        "summary": "The `json` and `defer` utilities were removed; return plain objects, or `data()` when you need a status or headers.",
+        "kind": "removed",
+        "affectedSymbols": [{ "name": "json", "type": "export" }, { "name": "defer", "type": "export" }],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Replace `json(value)` with `value` (or `data(value, init)` when you set status/headers).", "Replace `defer({...})` with a plain object; promises are streamed automatically."],
+        "sourceUrl": "https://github.com/remix-run/react-router/releases/tag/react-router%407.0.0",
+        "confidence": "high"
+      },
+      {
+        "id": "react-router-dom-merged",
+        "summary": "`react-router-dom` was collapsed into `react-router`; import from `react-router` (and `react-router/dom` for `RouterProvider`).",
+        "kind": "renamed",
+        "affectedSymbols": [{ "name": "react-router-dom", "type": "import-path" }],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Uninstall `react-router-dom` and install `react-router@7`.", "Change imports from `react-router-dom` to `react-router`; import `RouterProvider` from `react-router/dom` in DOM apps."],
+        "sourceUrl": "https://github.com/remix-run/react-router/blob/react-router@7.1.0/docs/upgrading/v6.md",
+        "confidence": "high"
+      },
+      {
+        "id": "future-flags-removed",
+        "summary": "All v6 `future.v7_*` flags were removed; their behaviour is now the default.",
+        "kind": "config",
+        "affectedSymbols": [
+          { "name": "v7_startTransition", "type": "option" },
+          { "name": "v7_relativeSplatPath", "type": "option" },
+          { "name": "v7_fetcherPersist", "type": "option" },
+          { "name": "v7_normalizeFormMethod", "type": "option" },
+          { "name": "v7_partialHydration", "type": "option" },
+          { "name": "v7_skipActionErrorRevalidation", "type": "option" }
+        ],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Adopt each flag on v6 first, then remove the `future` prop/option when upgrading."],
+        "sourceUrl": "https://github.com/remix-run/react-router/blob/react-router@7.1.0/docs/upgrading/v6.md",
+        "confidence": "high"
+      },
+      {
+        "id": "node-20-required",
+        "summary": "React Router 7 requires Node 20 or later for SSR.",
+        "kind": "runtime",
+        "affectedSymbols": [],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Run builds and servers on Node 20+."],
+        "sourceUrl": "https://github.com/remix-run/react-router/releases/tag/react-router%407.0.0",
+        "confidence": "high"
+      }
+    ]
+  },
+  "verdicts": {
+    "json-defer-removed@app/routes/account.tsx:1": {
+      "affected": "yes",
+      "reason": "Imports `defer` and `json`, which no longer exist in v7.",
+      "fix": { "before": "import { defer, json, useLoaderData } from 'react-router';", "after": "import { data, useLoaderData } from 'react-router';" }
+    },
+    "json-defer-removed@app/routes/account.tsx:7": {
+      "affected": "yes",
+      "reason": "`json(...)` with a status must become `data(...)`.",
+      "fix": { "before": "    return json({ error: 'not signed in' }, { status: 401 });", "after": "    return data({ error: 'not signed in' }, { status: 401 });" }
+    },
+    "json-defer-removed@app/routes/account.tsx:9": {
+      "affected": "yes",
+      "reason": "`defer(...)` was removed; return the object directly and the promise is streamed.",
+      "fix": { "before": "  return defer({ user, orders: getOrders(user.id) });", "after": "  return { user, orders: getOrders(user.id) };" }
+    },
+    "react-router-dom-merged@app/root.tsx:1": {
+      "affected": "yes",
+      "reason": "Imports from `react-router-dom`, which is no longer the v7 entry point.",
+      "fix": {
+        "before": "import { createBrowserRouter, RouterProvider } from 'react-router-dom';",
+        "after": "import { createBrowserRouter } from 'react-router';\nimport { RouterProvider } from 'react-router/dom';"
+      }
+    },
+    "future-flags-removed@app/root.tsx:7": {
+      "affected": "yes",
+      "reason": "Passes `future={{ v7_startTransition: true }}`; the flag no longer exists and the prop no longer type-checks.",
+      "fix": {
+        "before": "  return <RouterProvider router={router} future={{ v7_startTransition: true }} />;",
+        "after": "  return <RouterProvider router={router} />;"
+      }
+    },
+    "future-flags-removed@app/routes/home.tsx:3": {
+      "affected": "no",
+      "reason": "Only mentioned in a comment.",
+      "fix": null
+    }
+  }
+}

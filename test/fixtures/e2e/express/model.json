@@ -1,0 +1,85 @@
+{
+  "extraction": {
+    "breakingChanges": [
+      {
+        "id": "app-del-removed",
+        "summary": "`app.del()` was removed; use `app.delete()`.",
+        "kind": "removed",
+        "affectedSymbols": [{ "name": "app.del", "type": "member" }],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Rename `app.del(...)` to `app.delete(...)`."],
+        "sourceUrl": "https://github.com/expressjs/express/blob/v5.0.1/History.md",
+        "confidence": "high"
+      },
+      {
+        "id": "req-param-removed",
+        "summary": "`req.param(name)` was removed; read `req.params`, `req.body` or `req.query` explicitly.",
+        "kind": "removed",
+        "affectedSymbols": [{ "name": "req.param", "type": "member" }],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Replace `req.param('x')` with `req.params.x`, `req.body.x` or `req.query.x`."],
+        "sourceUrl": "https://github.com/expressjs/express/blob/v5.0.1/History.md",
+        "confidence": "high"
+      },
+      {
+        "id": "res-sendfile-removed",
+        "summary": "`res.sendfile()` was removed; use `res.sendFile()` (absolute path or `root` option).",
+        "kind": "removed",
+        "affectedSymbols": [{ "name": "res.sendfile", "type": "member" }],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Rename `res.sendfile(path)` to `res.sendFile(path)`."],
+        "sourceUrl": "https://github.com/expressjs/express/blob/v5.0.1/History.md",
+        "confidence": "high"
+      },
+      {
+        "id": "res-json-status-signature",
+        "summary": "`res.json(obj, status)` and `res.json(status, obj)` signatures were removed; set the status with `res.status()`.",
+        "kind": "signature",
+        "affectedSymbols": [{ "name": "res.json", "type": "member" }],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Replace `res.json(obj, status)` with `res.status(status).json(obj)`."],
+        "sourceUrl": "https://github.com/expressjs/express/blob/v5.0.1/History.md",
+        "confidence": "high"
+      },
+      {
+        "id": "redirect-back-removed",
+        "summary": "`res.redirect('back')` and `res.location('back')` are no longer supported magic strings.",
+        "kind": "behavior",
+        "affectedSymbols": [],
+        "searchPatterns": ["/(redirect|location)\\(\\s*['\"]back['\"]/"],
+        "fileGlobs": [],
+        "migration": ["Use `req.get('Referrer') || '/'` explicitly."],
+        "sourceUrl": "https://github.com/expressjs/express/blob/v5.0.1/History.md",
+        "confidence": "high"
+      }
+    ]
+  },
+  "verdicts": {
+    "app-del-removed@src/server.js:20": {
+      "affected": "yes",
+      "reason": "Registers a route with the removed `app.del`.",
+      "fix": { "before": "app.del('/items/:id', (req, res) => {", "after": "app.delete('/items/:id', (req, res) => {" }
+    },
+    "req-param-removed@src/server.js:16": {
+      "affected": "yes",
+      "reason": "`req.param('id')` no longer exists; the value is a route parameter.",
+      "fix": { "before": "  const id = req.param('id');", "after": "  const id = req.params.id;" }
+    },
+    "res-sendfile-removed@src/server.js:25": {
+      "affected": "yes",
+      "reason": "Calls the removed lowercase `res.sendfile`.",
+      "fix": { "before": "  res.sendfile('/var/reports/latest.pdf');", "after": "  res.sendFile('/var/reports/latest.pdf');" }
+    },
+    "res-json-status-signature@src/server.js:7": { "affected": "no", "reason": "Single-argument `res.json(obj)` is unchanged.", "fix": null },
+    "res-json-status-signature@src/server.js:12": {
+      "affected": "yes",
+      "reason": "Passes the status as a second argument, which v5 no longer accepts.",
+      "fix": { "before": "  res.json(item, 201);", "after": "  res.status(201).json(item);" }
+    },
+    "res-json-status-signature@src/server.js:17": { "affected": "no", "reason": "Single-argument `res.json(obj)` is unchanged.", "fix": null }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "eslint",
+  "version": "9.0.0",
+  "description": "An AST-based pattern checker for JavaScript.",
+  "repository": {
+    "url": "git+https://github.com/eslint/eslint.git",
+    "type": "git"
+  },
+  "homepage": "https://eslint.org",
+  "bugs": {
+    "url": "https://github.com/eslint/eslint/issues/"
+  },
+  "license": "MIT"
+}
