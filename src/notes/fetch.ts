@@ -15,7 +15,14 @@ export interface GatherOptions {
 
 const CHANGELOG_NAMES = ['CHANGELOG.md', 'CHANGES.md', 'HISTORY.md', 'History.md', 'changelog.md', 'RELEASES.md', 'NEWS.md'];
 const MIGRATION_NAMES = /(^|\/)(MIGRATION|MIGRATING|UPGRADING|UPGRADE)(_GUIDE)?\.mdx?$/i;
-const UNINFORMATIVE = /^\s*(see|check)\s.*(changelog|CHANGELOG|release notes)/i;
+const POINTER = /\b(see|check|refer to|read)\b[^\n]*\b(changelog|release notes|changes)\b/i;
+
+/** A release body that only links elsewhere, e.g. "See the CHANGELOG for details". */
+export function isPointerOnly(body: string): boolean {
+  const text = body.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/https?:\/\/\S+/g, '').trim();
+  if (text.length < 40) return !/`[^`]+`/.test(text); // "- Remove `foo`" is short but real
+  return text.length < 300 && POINTER.test(text) && text.split('\n').filter((l) => l.trim()).length <= 3;
+}
 
 /**
  * Gather release notes for (from, to]: GitHub Releases first, CHANGELOG at the tag
@@ -33,7 +40,10 @@ export async function gatherNotes(gh: GitHubApi, registry: Registry, bump: Bump,
 
   // 1. GitHub Releases
   const releases = await findReleases(gh, repo, name, from, to, opts.maxReleasePages ?? 5);
-  for (const rel of releases) {
+  // Bodies that only point elsewhere ("See the CHANGELOG") carry nothing and would eat
+  // the size budget (React Router has one per version), so they don't count as notes.
+  const informative = releases.filter((x) => !isPointerOnly(x.body));
+  for (const rel of informative) {
     blocks.push({ title: `Release ${rel.tag}`, url: rel.url, body: rel.body, version: rel.version });
     sources.push({ kind: 'release', url: rel.url, title: rel.tag, version: rel.version });
   }
@@ -45,8 +55,8 @@ export async function gatherNotes(gh: GitHubApi, registry: Registry, bump: Bump,
   const paths = tree?.paths ?? [];
 
   // 2. CHANGELOG fallback when releases had nothing useful for this range
-  const releaseText = releases.map((x) => x.body).join('\n');
-  if (releaseText.trim().length < 200 || releases.every((x) => UNINFORMATIVE.test(x.body))) {
+  const releaseText = informative.map((x) => x.body).join('\n');
+  if (releaseText.trim().length < 200) {
     const file = pickChangelog(paths, repo.directory);
     const content = file ? await gh.getFile(owner, r, file, ref) : null;
     if (file && content) {
@@ -54,7 +64,7 @@ export async function gatherNotes(gh: GitHubApi, registry: Registry, bump: Bump,
       for (const b of sliceChangelog(content, from, to)) {
         blocks.push({ title: `${file} ${b.heading}`, url, body: b.text, version: b.version });
       }
-      if (blocks.length > releases.length) sources.push({ kind: 'changelog', url, title: file });
+      if (blocks.length > informative.length) sources.push({ kind: 'changelog', url, title: file });
     }
   }
 
