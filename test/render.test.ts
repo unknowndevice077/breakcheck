@@ -64,3 +64,10 @@ describe('renderComment size limit', () => {
     expect(body).toContain('This is advisory');
   });
 });
+
+describe('headline when the notes list nothing', () => {
+  it('says so instead of "0 checked"', () => {
+    const r = bigReport(1, 0, 0);
+    expect(renderComment(r)).toMatch(/^## ✅ The release notes list no breaking changes \(1 package checked\)$/m);
+  });
+});

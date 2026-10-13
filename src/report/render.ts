@@ -41,6 +41,7 @@ export function headline(run: RunReport): string {
   }
   if (t.possible) return `⚠️ ${plural(t.possible, 'breaking change')} may affect this repo`;
   if (t.missing.length) return `❓ Couldn't find release notes for ${t.missing.map((p) => p.bump.name).join(', ')}`;
+  if (!t.checked) return `✅ The release notes list no breaking changes (${plural(run.packages.length, 'package')} checked)`;
   // Never let the green tick suggest more certainty than there is.
   const unsure = t.manual ? `, ${t.manual} can't be checked automatically` : '';
   return `✅ No breaking changes found that affect your code (${t.checked} checked${unsure})`;
