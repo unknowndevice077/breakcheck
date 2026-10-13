@@ -291,7 +291,15 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
   const extraCounts = new Map<string, number>();
   const textCache = new Map<string, string[]>();
 
-  const isPackageName = (p: string) => [pkg, shortName].includes(p.replace(/^['"]|['"]$/g, '').trim());
+  // `date-fns`, `'date-fns'` or the regex `/date-fns/`
+  const isPackageName = (p: string) =>
+    [pkg, shortName].includes(
+      p
+        .trim()
+        .replace(/^\/(.*)\/[a-z]*$/, '$1')
+        .replace(/\\(.)/g, '$1')
+        .replace(/^['"]|['"]$/g, ''),
+    );
   const readLines = (f: string): string[] | null => {
     if (isSecretFile(f)) return null;
     if (textCache.has(f)) return textCache.get(f) ?? null;
