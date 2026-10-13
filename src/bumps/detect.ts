@@ -62,13 +62,19 @@ async function collectProjects(changedFiles: string[], read: ReadFile) {
   // Load every lockfile that changed, plus lockfiles that sit next to (or above) changed manifests.
   const candidateLockfiles = new Set(changedFiles.filter((f) => lockfileKind(f)));
   const dirsWithChangedLockfile = new Set([...candidateLockfiles].map((f) => (path.dirname(f) === '.' ? '' : path.dirname(f))));
-  for (const dir of projectDirs) {
+  const ancestors = (dir: string) => {
+    const out: string[] = [];
     for (let d = dir; ; d = path.dirname(d) === '.' ? '' : path.dirname(d)) {
-      // A lockfile that changed in this PR is the one that matters; don't probe for others.
-      if (dirsWithChangedLockfile.has(d)) break;
-      for (const name of Object.keys(LOCKFILE_NAMES)) candidateLockfiles.add(d ? `${d}/${name}` : name);
-      if (!d) break;
+      out.push(d);
+      if (!d) return out;
     }
+  };
+  for (const dir of projectDirs) {
+    // A lockfile that changed in this PR at or above this project is the one that matters
+    // (workspace lockfiles live at the root); only probe when there is none.
+    const chain = ancestors(dir);
+    if (chain.some((d) => dirsWithChangedLockfile.has(d))) continue;
+    for (const d of chain) for (const name of Object.keys(LOCKFILE_NAMES)) candidateLockfiles.add(d ? `${d}/${name}` : name);
   }
 
   for (const file of candidateLockfiles) {

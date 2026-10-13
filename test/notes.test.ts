@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isPointerOnly, pickChangelog, pickMigrationGuides } from '../src/notes/fetch.js';
+import { gatherNotes, isPointerOnly, pickChangelog, pickMigrationGuides } from '../src/notes/fetch.js';
+import type { GitHubApi, Release } from '../src/github.js';
 import { parseGitHubRepo } from '../src/notes/registry.js';
 
 describe('parseGitHubRepo', () => {
@@ -65,4 +66,33 @@ describe('isPointerOnly', () => {
     ['- Remove `foo`', false],
     ['### Breaking Changes\n- `json` was removed; return plain objects.\n- `defer` was removed.', false],
   ])('%j → %s', (body, expected) => expect(isPointerOnly(body)).toBe(expected));
+});
+
+describe('gatherNotes: projects with more releases than we page through', () => {
+  it('still fetches the x.0.0 release that lists the breaking changes', async () => {
+    // 5 full pages of newest-first patch releases (5.104.x … 5.100.x), none reaching 4.44.0
+    const page = (n: number): Release[] =>
+      Array.from({ length: 100 }, (_, i) => {
+        const minor = 104 - n;
+        const v = `5.${minor}.${99 - i}`;
+        return { tag: `v${v}`, name: `v${v}`, body: `- fix(query-core): something small in ${v}`, url: `https://x/${v}`, draft: false, prerelease: false };
+      });
+    const asked: string[] = [];
+    const gh = {
+      stats: { requests: 0, rateLimited: 0 },
+      listReleases: async (_o: string, _r: string, p: number) => page(p - 1),
+      getReleaseByTag: async (_o: string, _r: string, tag: string) => {
+        asked.push(tag);
+        return tag === 'v5.0.0' ? { tag, name: tag, body: '## Breaking changes\n- `cacheTime` was renamed to `gcTime`', url: 'https://x/v5.0.0', draft: false, prerelease: false } : null;
+      },
+      refExists: async () => false,
+      listTree: async () => ({ paths: [], truncated: false }),
+      getFile: async () => null,
+    } as unknown as GitHubApi;
+    const registry = { repoFor: async () => ({ repo: { owner: 'TanStack', repo: 'query' }, rawRepository: 'x' }) };
+    const notes = await gatherNotes(gh, registry, { name: '@tanstack/react-query', fromVersion: '4.44.0', toVersion: '5.104.2', bumpType: 'major', manifests: [], depTypes: [] }, { budget: 30_000 });
+    expect(asked).toContain('v5.0.0');
+    expect(notes.sources.map((x) => x.title)).toContain('v5.0.0');
+    expect(notes.text).toContain('`cacheTime` was renamed to `gcTime`');
+  });
 });

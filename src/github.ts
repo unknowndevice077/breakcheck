@@ -20,6 +20,7 @@ export interface GitHubApi {
   refExists(owner: string, repo: string, tag: string): Promise<boolean>;
   listTree(owner: string, repo: string, ref: string): Promise<{ paths: string[]; truncated: boolean } | null>;
   listReleases(owner: string, repo: string, page: number): Promise<Release[]>;
+  getReleaseByTag(owner: string, repo: string, tag: string): Promise<Release | null>;
   listPullFiles(owner: string, repo: string, pull: number): Promise<string[]>;
   listIssueComments(owner: string, repo: string, issue: number): Promise<IssueComment[]>;
   createComment(owner: string, repo: string, issue: number, body: string): Promise<{ id: number; url: string }>;
@@ -115,6 +116,18 @@ export function createGitHubApi(token: string, opts: { fetch?: typeof fetch; bas
         return data.map((r) => ({ tag: r.tag_name, name: r.name ?? r.tag_name, body: r.body ?? '', url: r.html_url, draft: r.draft, prerelease: r.prerelease }));
       } catch (e) {
         if (notFound(e)) return [];
+        throw e;
+      }
+    },
+    async getReleaseByTag(owner, repo, tag) {
+      try {
+        const r = await call<{ tag_name: string; name: string | null; body: string | null; html_url: string; draft: boolean; prerelease: boolean }>(
+          'GET /repos/{owner}/{repo}/releases/tags/{tag}',
+          { owner, repo, tag },
+        );
+        return { tag: r.tag_name, name: r.name ?? r.tag_name, body: r.body ?? '', url: r.html_url, draft: r.draft, prerelease: r.prerelease };
+      } catch (e) {
+        if (notFound(e)) return null;
         throw e;
       }
     },

@@ -118,6 +118,26 @@ describe('detectBumps: npm', () => {
   });
 });
 
+describe('detectBumps: request economy', () => {
+  it('does not probe for lockfiles in subdirectories when the workspace root lockfile changed', async () => {
+    const files: Record<string, string> = {};
+    const reads: string[] = [];
+    const read: ReadFile = async (f, side) => {
+      reads.push(f);
+      return side === 'base' ? (files[`b:${f}`] ?? null) : (files[`h:${f}`] ?? null);
+    };
+    const lock = (v: string) => `lockfileVersion: '9.0'\n\nimporters:\n\n  .: {}\n\n  apps/web:\n    dependencies:\n      next:\n        specifier: ${v}\n        version: ${v}\n`;
+    Object.assign(files, {
+      'b:package.json': '{}', 'h:package.json': '{}',
+      'b:apps/web/package.json': pkg({ next: '14.2.15' }), 'h:apps/web/package.json': pkg({ next: '15.1.0' }),
+      'b:pnpm-lock.yaml': lock('14.2.15'), 'h:pnpm-lock.yaml': lock('15.1.0'),
+    });
+    const { bumps } = await detectBumps(['apps/web/package.json', 'pnpm-lock.yaml'], read, { includePatch: false });
+    expect(bumps.map((b) => b.name)).toEqual(['next']);
+    expect(reads.filter((f) => /lock|shrinkwrap/.test(f) && f !== 'pnpm-lock.yaml')).toEqual([]);
+  });
+});
+
 describe('detectBumps: pnpm', () => {
   const v9 = (rr: string) => `lockfileVersion: '9.0'
 
