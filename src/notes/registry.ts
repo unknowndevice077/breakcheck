@@ -35,7 +35,8 @@ export interface Registry {
 
 export function createRegistry(opts: { fetch?: typeof fetch; baseUrl?: string } = {}): Registry {
   const f = opts.fetch ?? fetch;
-  const base = (opts.baseUrl ?? 'https://registry.npmjs.org').replace(/\/$/, '');
+  // npm's own setting, so private mirrors work the same way they do for `npm install`
+  const base = (opts.baseUrl ?? process.env.npm_config_registry ?? process.env.NPM_CONFIG_REGISTRY ?? 'https://registry.npmjs.org').replace(/\/$/, '');
   return {
     async repoFor(name, version) {
       // The per-version document is small even for packages with thousands of versions.

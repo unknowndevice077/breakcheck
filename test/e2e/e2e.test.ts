@@ -181,7 +181,7 @@ async function execute(s: Scenario, opts: RunOpts) {
   });
   const gateway = new ModelGateway(provider);
   const gh = createGitHubApi('ghs_test', { fetch: rec.fetch });
-  const result = await run(CTX, { gh, registry: createRegistry({ fetch: rec.fetch }), cache: opts.cache ?? createMemoryCache(), gateway, workspace: s.workspace, ...(reason ? { providerReason: reason } : {}) }, { includePatch: false, maxPackages: 10 });
+  const result = await run(CTX, { gh, registry: createRegistry({ fetch: rec.fetch, baseUrl: 'https://registry.npmjs.org' }), cache: opts.cache ?? createMemoryCache(), gateway, workspace: s.workspace, ...(reason ? { providerReason: reason } : {}) }, { includePatch: false, maxPackages: 10 });
   const posted = rec.requests.filter((r) => /\/issues\/(7\/)?comments/.test(r.url) && (r.method === 'POST' || r.method === 'PATCH'));
   // Only tag-existence probes may miss; anything else means the recording is incomplete.
   const unexpected = rec.unmatched.filter((u) => !u.includes('/git/ref/tags/'));
@@ -356,7 +356,7 @@ describe('caching and comment lifecycle', () => {
   it('does nothing when the PR has no dependency bumps', async () => {
     const rec = prRoutes({ ...CTX, files: { 'README.md': { base: 'a', head: 'b' } } });
     const f = createRecordedFetch(rec);
-    const res = await run(CTX, { gh: createGitHubApi('t', { fetch: f.fetch }), registry: createRegistry({ fetch: f.fetch }), cache: createMemoryCache(), gateway: new ModelGateway(null), workspace: fixturePath('e2e/express/repo') }, { includePatch: false, maxPackages: 10 });
+    const res = await run(CTX, { gh: createGitHubApi('t', { fetch: f.fetch }), registry: createRegistry({ fetch: f.fetch, baseUrl: 'https://registry.npmjs.org' }), cache: createMemoryCache(), gateway: new ModelGateway(null), workspace: fixturePath('e2e/express/repo') }, { includePatch: false, maxPackages: 10 });
     expect(res.report).toBeNull();
     expect(f.requests.filter((q) => q.method !== 'GET')).toEqual([]);
   });
