@@ -140,6 +140,7 @@ Outputs: `affected-count`, `possibly-affected-count`, `mode` (`ai`/`rules`/`mixe
 ## Limitations
 
 - **JavaScript/TypeScript with npm, pnpm or yarn only.** Only direct dependencies are analysed.
+- **Vue, Svelte and Astro components** are searched through their `<script>` blocks (and Astro frontmatter). Template expressions are only covered by text patterns, not by symbol search.
 - **Usage search is static.** Instance members such as `res.json` are matched by property name in files that import the package, so the AI step or a human needs to confirm them. Values passed around through variables, `eval` and string-built imports are not followed.
 - **The finder only sees what the release notes say.** If a project doesn't document a break, breakcheck can't know about it. Projects without GitHub releases or a changelog get the ❓ headline.
   - Example: ESLint 9 rejects `--ext` under flat config, but neither the v9 release notes nor the v9 migration guide name the flag. breakcheck flags your `.eslintrc*` file, not the `--ext` in your scripts.

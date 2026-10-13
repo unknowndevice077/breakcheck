@@ -4,6 +4,8 @@ import { Node, Project, SyntaxKind, ts, type SourceFile } from 'ts-morph';
 import type { BreakingChange, HitKind, UsageHit } from '../types.js';
 
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/;
+/** Single-file components: imports live in <script> blocks (and Astro frontmatter). */
+const COMPONENT_EXT = /\.(?:vue|svelte|astro)$/;
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache', 'vendor', '.yarn', '.pnpm-store']);
 const MAX_FILE_BYTES = 1_000_000;
 const MAX_FILES = 20_000;
@@ -62,6 +64,36 @@ export function listRepoFiles(root: string): string[] {
   };
   walk(root);
   return out.sort();
+}
+
+/**
+ * The script parts of a .vue/.svelte/.astro file, with everything else blanked out
+ * so line numbers stay those of the original file. Template expressions are not
+ * parsed; text patterns still run over the whole file.
+ */
+export function componentScript(file: string, text: string): { text: string; ext: 'ts' | 'tsx' } {
+  const keep: [number, number][] = [];
+  let ext: 'ts' | 'tsx' = 'ts';
+  if (file.endsWith('.astro')) {
+    const fm = /^\s*---[^\n]*\n([\s\S]*?)\n---/.exec(text);
+    if (fm?.[1] !== undefined) keep.push([fm.index + fm[0].indexOf(fm[1]), fm.index + fm[0].indexOf(fm[1]) + fm[1].length]);
+  }
+  for (const m of text.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
+    const attrs = m[1] ?? '';
+    if (/\btype\s*=\s*["']?(?!module|text\/javascript|text\/typescript)[\w/+-]/i.test(attrs)) continue; // JSON, templates, ...
+    if (/\blang\s*=\s*["']?[jt]sx\b/i.test(attrs)) ext = 'tsx';
+    const start = (m.index ?? 0) + m[0].indexOf('>') + 1;
+    keep.push([start, start + (m[2] ?? '').length]);
+  }
+  let out = '';
+  let pos = 0;
+  for (const [a, b] of keep.sort((x, y) => x[0] - y[0])) {
+    if (a < pos) continue;
+    out += text.slice(pos, a).replace(/[^\n]/g, ' ') + text.slice(a, b);
+    pos = b;
+  }
+  out += text.slice(pos).replace(/[^\n]/g, ' ');
+  return { text: out, ext };
 }
 
 function matchesPackage(specifier: string, pkg: string): boolean {
@@ -297,14 +329,16 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
   const importing: { file: string; sf: SourceFile; b: Bindings }[] = [];
   const needles = [pkg, ...importPaths];
   for (const f of files) {
-    if (!SOURCE_EXT.test(f) || f.endsWith('.d.ts')) continue;
+    const component = COMPONENT_EXT.test(f);
+    if ((!SOURCE_EXT.test(f) && !component) || f.endsWith('.d.ts')) continue;
     const lines = readLines(f);
     if (!lines) continue;
-    const text = lines.join('\n');
-    if (!needles.some((n) => text.includes(`'${n}`) || text.includes(`"${n}`) || text.includes(`\`${n}`))) continue;
+    const raw = lines.join('\n');
+    if (!needles.some((n) => raw.includes(`'${n}`) || raw.includes(`"${n}`) || raw.includes(`\`${n}`))) continue;
+    const script = component ? componentScript(f, raw) : null;
     let sf: SourceFile;
     try {
-      sf = project.createSourceFile(`/${f}`, text, { overwrite: true });
+      sf = project.createSourceFile(script ? `/${f}.${script.ext}` : `/${f}`, script ? script.text : raw, { overwrite: true });
     } catch {
       unanalysed.push(`${f}: could not be parsed`);
       continue;
