@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickChangelog, pickMigrationGuides } from '../src/notes/fetch.js';
+import { isPointerOnly, pickChangelog, pickMigrationGuides } from '../src/notes/fetch.js';
 import { parseGitHubRepo } from '../src/notes/registry.js';
 
 describe('parseGitHubRepo', () => {
@@ -55,4 +55,14 @@ describe('pickMigrationGuides', () => {
   it('root MIGRATION.md / UPGRADING.md always qualify', () => {
     expect(pickMigrationGuides(['UPGRADING.md', 'README.md'], undefined, [3], 2)).toEqual(['UPGRADING.md']);
   });
+});
+
+describe('isPointerOnly', () => {
+  it.each([
+    ['See the [CHANGELOG](https://github.com/remix-run/react-router/blob/main/CHANGELOG.md#v7180) for details.', true],
+    ['See https://github.com/x/y/blob/main/CHANGELOG.md', true],
+    ['', true],
+    ['- Remove `foo`', false],
+    ['### Breaking Changes\n- `json` was removed; return plain objects.\n- `defer` was removed.', false],
+  ])('%j → %s', (body, expected) => expect(isPointerOnly(body)).toBe(expected));
 });

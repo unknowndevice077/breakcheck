@@ -14,7 +14,7 @@ export interface ExtractionCache {
 
 export function cacheKey(parts: { pkg: string; from: string; to: string; label: string }): string {
   // Bump the version prefix whenever the prompt or schema changes meaningfully.
-  const raw = `breakcheck-v1-${parts.label}-${parts.pkg}-${parts.from}-${parts.to}`;
+  const raw = `breakcheck-v2-${parts.label}-${parts.pkg}-${parts.from}-${parts.to}`;
   return raw.replace(/[^\w.@/-]/g, '_').slice(0, 400);
 }
 

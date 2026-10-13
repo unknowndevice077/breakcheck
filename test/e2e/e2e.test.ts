@@ -246,7 +246,8 @@ describe('specific outcomes', () => {
     ]);
     expect(get('future-flags-removed').hits.map((h) => `${h.file}:${h.line}:${h.verdict}`)).toEqual(['app/root.tsx:7:yes', 'app/routes/home.tsx:3:no']);
     expect(get('node-20-required').hits).toEqual([]);
-    expect(pkg.notes.sources.map((s) => s.kind)).toEqual(['release', 'release', 'release', 'release', 'migration-guide']);
+    // 7.0.1's entry is empty, so that release carries no notes
+    expect(pkg.notes.sources.map((s) => `${s.kind} ${s.title}`)).toEqual(['release react-router@7.0.0', 'release react-router@7.0.2', 'release react-router@7.1.0', 'migration-guide docs/upgrading/v6.md']);
     expect(r.result.affected).toBe(3);
     // Model saw only snippets: no request carried a whole file it did not need
     const modelBodies = r.rec.requests.filter((q) => q.url.includes('api.anthropic.com')).map((q) => q.body ?? '');
@@ -266,6 +267,29 @@ describe('specific outcomes', () => {
     expect(extra[0]!.change.confidence).toBe('low');
     // Locations the model's own changes already cover are not repeated
     expect(extra[0]!.hits.map((h) => h.line)).not.toContain(1);
+  });
+
+  it('react-router: pointer-only release bodies are skipped so the CHANGELOG fits the budget', async () => {
+    // Seen on a real run: one "See the CHANGELOG" release per version used up the notes budget.
+    const s = reactRouter();
+    const pointer = (v: string) => ({ tag: `react-router@${v}`, body: `See the [CHANGELOG](https://github.com/remix-run/react-router/blob/main/CHANGELOG.md#v${v.replace(/\./g, '')}) for details.` });
+    const versions = sliceChangelog(fixture('upstream/react-router.CHANGELOG.md'), '6.28.0', '7.1.0').map((b) => b.version).reverse();
+    s.routes = [
+      ...s.routes.filter((r) => !r.url.includes('/repos/remix-run/react-router/')),
+      ...upstreamRoutes({
+        owner: 'remix-run',
+        repo: 'react-router',
+        releases: versions.map(pointer),
+        ref: 'react-router@7.1.0',
+        files: { 'packages/react-router/CHANGELOG.md': fixture('upstream/react-router.CHANGELOG.md'), 'docs/upgrading/v6.md': fixture('upstream/react-router.upgrading-v6.md') },
+      }),
+    ];
+    const r = await execute(s, { provider: 'none' });
+    expect(r.unexpected).toEqual([]);
+    const pkg = r.result.report!.packages[0]!;
+    expect(pkg.notes.sources.map((x) => x.kind)).toEqual(['changelog', 'migration-guide']);
+    expect(pkg.notes.text).not.toContain('=== Release ');
+    expect(pkg.changes.some((c) => c.change.affectedSymbols.some((x) => x.name === 'json') && c.hits.some((h) => h.line === 7))).toBe(true);
   });
 
   it('express (AI): the model separates res.json(obj) from res.json(obj, status)', async () => {
@@ -355,7 +379,7 @@ describe('caching and comment lifecycle', () => {
     const cache = createMemoryCache();
     const first = await execute(express(), { provider: 'anthropic', model: loadModel('express'), cache });
     expect(first.gateway.calls.some((c) => c.purpose.startsWith('extract'))).toBe(true);
-    expect([...cache.store.keys()]).toEqual(['breakcheck-v1-anthropic/claude-opus-5-5-express-4.21.2-5.0.1']);
+    expect([...cache.store.keys()]).toEqual(['breakcheck-v2-anthropic/claude-opus-5-5-express-4.21.2-5.0.1']);
     const second = await execute(express(), { provider: 'anthropic', model: loadModel('express'), cache });
     expect(second.gateway.calls.some((c) => c.purpose.startsWith('extract'))).toBe(false);
     expect(second.result.report!.packages[0]!.fromCache).toBe(true);
