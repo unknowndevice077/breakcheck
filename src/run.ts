@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path/posix';
 import { detectBumps } from './bumps/detect.js';
 import { lockfileKind } from './bumps/lockfiles.js';
@@ -11,8 +12,9 @@ import type { ModelGateway } from './providers/index.js';
 import { ProviderError } from './providers/types.js';
 import { upsertComment } from './report/comment.js';
 import { renderComment, renderNoBumps, tally } from './report/render.js';
-import type { BreakingChange, Bump, ExtractionResult, PackageReport, ReleaseNotes, RunReport, UsageHit } from './types.js';
-import { findUsages } from './usage/finder.js';
+import type { BreakingChange, Bump, ExtractionResult, PackageReport, ReleaseNotes, RunReport, UsageHit, VerifiedHit } from './types.js';
+import { typeCheckUpgrade, type CompilerDiagnostic, type FetchTarball } from './typecheck/typecheck.js';
+import { findUsages, snippet } from './usage/finder.js';
 import { verifyHits } from './verify/verify.js';
 
 export interface RunContext {
@@ -32,6 +34,8 @@ export interface RunDeps {
   workspace: string;
   /** Why there is no provider, when there is none */
   providerReason?: string;
+  /** Downloads package tarballs; when set, importing TypeScript files are type-checked against both versions */
+  tarball?: FetchTarball;
   log?: (msg: string) => void;
 }
 
@@ -50,6 +54,10 @@ export interface RunResult {
   affected: number;
   possible: number;
 }
+
+const TS_SOURCE = /\.(?:[cm]?ts|tsx)$/;
+/** "Now ESM-only"/"CommonJS removed": compiles fine, fails at runtime, so the compiler can't rule it out. */
+const MODULE_FORMAT_CHANGE = /\b(esm|es modules?|commonjs|cjs|require\(\)?|pure esm|runtime|node(?:\.js)? \d+)\b/i;
 
 const isDependencyFile = (f: string) => path.basename(f) === 'package.json' || lockfileKind(f) !== null;
 
@@ -165,6 +173,7 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions, extra
 
   // Usage search (deterministic) and verification (AI only)
   let hits = new Map<string, UsageHit[]>();
+  let importingFiles: string[] = [];
   try {
     const found = findUsages(deps.workspace, bump.name, [...changes, ...extras]);
     hits = found.hits;
@@ -181,6 +190,7 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions, extra
         changes = [...changes, x];
       }
     }
+    importingFiles = found.importingFiles;
     unanalysed.push(...found.unanalysed);
     for (const d of found.diagnostics) log(`  note: ${d}`);
     if (!found.importingFiles.length && changes.length) unanalysed.push(`no source file imports ${bump.name} (config files and scripts were still checked)`);
@@ -196,6 +206,21 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions, extra
   }
   const verification = await verifyHits(verifyWithAI ? gateway : disabledGateway(gateway), bump, changes, hits);
   if (verification.error) unanalysed.push(`AI verification failed for some locations, shown as "possibly": ${verification.error}`);
+
+  // Compile-level ground truth, independent of what the notes say.
+  let typecheck: PackageReport['typecheck'];
+  let compilerChange: { change: BreakingChange; hits: VerifiedHit[] } | null = null;
+  if (deps.tarball && importingFiles.length) {
+    try {
+      const tc = await typeCheckUpgrade(deps.workspace, bump, importingFiles, deps.tarball);
+      typecheck = { ran: tc.ran, ...(tc.reason ? { reason: tc.reason } : {}), files: tc.checkedFiles, errors: tc.introduced.length };
+      log(tc.ran ? `type-check: ${tc.checkedFiles} file(s), ${tc.introduced.length} new error(s) with ${bump.toVersion}` : `type-check skipped: ${tc.reason}`);
+      if (tc.ran) compilerChange = await applyTypeCheck(bump, deps, tc.introduced, changes, verification.verified, verifyWithAI);
+    } catch (e) {
+      log(`type-check failed: ${(e as Error).message}`);
+      typecheck = { ran: false, reason: `type-check failed: ${(e as Error).message}`, files: 0, errors: 0 };
+    }
+  }
 
   // What was searched and what came of it, for anyone reading the job log.
   log(`::group::${bump.name}: ${changes.length} breaking change(s), ${mode === 'ai' ? 'AI' : 'rule-based'}${fromCache ? ' (cached extraction)' : ''}`);
@@ -214,10 +239,99 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions, extra
     mode,
     ...(mode === 'ai' && gateway.label ? { modelLabel: gateway.label } : {}),
     ...(mode === 'rules' && fallbackReason ? { fallbackReason } : {}),
-    changes: changes.map((change) => ({ change, hits: verification.verified.get(change.id) ?? [] })),
+    changes: [...(compilerChange ? [compilerChange] : []), ...changes.map((change) => ({ change, hits: verification.verified.get(change.id) ?? [] }))],
     unanalysed,
     fromCache,
+    ...(typecheck ? { typecheck } : {}),
   };
+}
+
+const COMPILER_CHANGE_ID = 'typescript-errors';
+
+/**
+ * Fold compiler results into the report:
+ * - a note-based hit on a line the compiler rejects is confirmed (verdict yes);
+ * - a note-based "removed export / import path" hit on a line that still compiles is ruled out;
+ * - errors no note-based change explains become their own change, with AI-suggested fixes when available.
+ */
+async function applyTypeCheck(
+  bump: Bump,
+  deps: RunDeps,
+  introduced: CompilerDiagnostic[],
+  changes: BreakingChange[],
+  verified: Map<string, VerifiedHit[]>,
+  withAI: boolean,
+): Promise<{ change: BreakingChange; hits: VerifiedHit[] } | null> {
+  const byLine = new Map<string, CompilerDiagnostic[]>();
+  for (const d of introduced) {
+    const k = `${d.file}:${d.line}`;
+    byLine.set(k, [...(byLine.get(k) ?? []), d]);
+  }
+  const describe = (ds: CompilerDiagnostic[]) => ds.map((d) => `TS${d.code}: ${d.message}`).join(' ').slice(0, 400);
+  // An import that fails turns the name into `any`, so later uses compile: judge names by the
+  // errors that mention them anywhere in the file, not by the line alone.
+  const mentions = (d: CompilerDiagnostic, name: string) => d.message.includes(`'${name}'`) || d.message.includes(`'${name}/`) || d.message.includes(`"${name}"`);
+  const reportedMissing = (file: string, name: string) => introduced.some((d) => d.file === file && mentions(d, name));
+  const explained = new Set<string>();
+  for (const change of changes) {
+    const removal = !MODULE_FORMAT_CHANGE.test(`${change.summary} ${change.migration.join(' ')}`);
+    const names = change.affectedSymbols.filter((s) => s.type === 'export' || s.type === 'import-path').map((s) => s.name);
+    for (const h of verified.get(change.id) ?? []) {
+      const k = `${h.file}:${h.line}`;
+      const ds = byLine.get(k);
+      const name = h.kind === 'symbol' ? names.find((n) => h.matched === n || h.matched.startsWith(`${n} as `) || h.matched.startsWith(`${n}/`)) : undefined;
+      const relevant = ds && (name === undefined ? ds : ds.filter((d) => mentions(d, name)));
+      if (relevant?.length) {
+        explained.add(k);
+        if (h.verdict !== 'yes') Object.assign(h, { verdict: 'yes', reason: `Confirmed by the TypeScript compiler: ${describe(relevant)}` });
+      } else if (removal && name !== undefined && h.verdict !== 'no' && TS_SOURCE.test(h.file) && !reportedMissing(h.file, name)) {
+        Object.assign(h, { verdict: 'no', reason: `The TypeScript compiler accepts \`${name}\` with ${bump.name} ${bump.toVersion}, so it still exists.`, fix: null });
+      }
+    }
+  }
+  const rest = [...byLine].filter(([k]) => !explained.has(k));
+  if (!rest.length) return null;
+
+  const change: BreakingChange = {
+    id: COMPILER_CHANGE_ID,
+    summary: `Code that no longer type-checks against ${bump.name} ${bump.toVersion}`,
+    kind: 'signature',
+    affectedSymbols: [],
+    searchPatterns: [],
+    fileGlobs: [],
+    migration: [],
+    sourceUrl: null,
+    confidence: 'high',
+  };
+  const fileLines = new Map<string, string[]>();
+  const linesOf = (f: string) => {
+    if (!fileLines.has(f)) {
+      let text = '';
+      try {
+        text = readFileSync(path.join(deps.workspace, f), 'utf8');
+      } catch {
+        // deleted between checks; the snippet stays empty
+      }
+      fileLines.set(f, text.split(/\r?\n/));
+    }
+    return fileLines.get(f) ?? [];
+  };
+  const hits: VerifiedHit[] = rest.map(([, ds], i) => {
+    const d = ds[0] as CompilerDiagnostic;
+    const s = snippet(linesOf(d.file), d.line, 10);
+    return { id: `${COMPILER_CHANGE_ID}#${i + 1}`, changeId: COMPILER_CHANGE_ID, file: d.file, line: d.line, kind: 'compiler', matched: `TS${d.code}`, snippet: s.text, snippetStartLine: s.start, verdict: 'yes', reason: describe(ds), fix: null };
+  });
+
+  // The compiler decides the verdict; the model only proposes fixes, one pseudo-change per error.
+  if (withAI) {
+    const pseudo = hits.map((h) => ({ ...change, id: `${h.id}`, summary: `After the upgrade this location fails to type-check. Compiler error: ${h.reason}` }));
+    const out = await verifyHits(deps.gateway, bump, pseudo, new Map(hits.map((h, i) => [pseudo[i]!.id, [h]])));
+    hits.forEach((h, i) => {
+      const v = out.verified.get(pseudo[i]!.id)?.[0];
+      if (v?.fix) h.fix = v.fix;
+    });
+  }
+  return { change, hits };
 }
 
 /**

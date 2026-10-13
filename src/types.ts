@@ -63,7 +63,7 @@ export interface ReleaseNotes {
   missingReason?: string;
 }
 
-export type HitKind = 'symbol' | 'pattern' | 'file' | 'dynamic';
+export type HitKind = 'symbol' | 'pattern' | 'file' | 'dynamic' | 'compiler';
 
 export interface UsageHit {
   /** Stable id: `${changeId}#${index}` */
@@ -106,6 +106,8 @@ export interface PackageReport {
   /** Things we could not analyse (dynamic imports, unparsable files, ...) */
   unanalysed: string[];
   fromCache: boolean;
+  /** Type-check of the importing files against the old and new declarations */
+  typecheck?: { ran: boolean; reason?: string; files: number; errors: number };
 }
 
 export interface RunReport {
