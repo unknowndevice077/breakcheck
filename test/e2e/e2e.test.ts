@@ -406,6 +406,7 @@ describe('type-check against old and new declarations', () => {
         breakingChanges: [
           { id: 'old-fn', summary: 'oldFn was removed', kind: 'removed', affectedSymbols: [{ name: 'oldFn', type: 'export' }], searchPatterns: [], fileGlobs: [], migration: [], sourceUrl: null, confidence: 'high' },
           { id: 'same-gone', summary: 'same was removed (wrongly claimed)', kind: 'removed', affectedSymbols: [{ name: 'same', type: 'export' }], searchPatterns: [], fileGlobs: [], migration: [], sourceUrl: null, confidence: 'high' },
+          { id: 'unrelated', summary: 'Widget.render changed', kind: 'behavior', affectedSymbols: [{ name: 'Widget.render', type: 'member' }], searchPatterns: ['configure('], fileGlobs: [], migration: [], sourceUrl: null, confidence: 'high' },
         ],
       },
       verdicts: {
@@ -416,6 +417,7 @@ describe('type-check against old and new declarations', () => {
         'same-gone@src/clean.ts:1': { affected: 'yes', reason: 'imports same', fix: null },
         'same-gone@src/clean.ts:3': { affected: 'yes', reason: 'calls same', fix: null },
         'typescript-errors@src/use.ts:5': { affected: 'yes', reason: 'legacy option', fix: null },
+        'unrelated@src/use.ts:5': { affected: 'no', reason: 'not about render', fix: null },
       } as unknown as CannedModel['verdicts'],
     };
     const s = scenario();
@@ -432,7 +434,9 @@ describe('type-check against old and new declarations', () => {
     // `same` still exists: nothing the compiler reports mentions it, so every claim is ruled out,
     // even on line 1, which fails only because of `oldFn`
     expect(verdicts('same-gone')).toEqual(['src/clean.ts:1=no', 'src/clean.ts:3=no', 'src/use.ts:1=no', 'src/use.ts:6=no']);
-    // line 5 is not explained by any note, so it is reported on its own
+    // line 5's error is about `legacy`, not `render`: it does not confirm the unrelated change,
+    // and is reported on its own
+    expect(verdicts('unrelated')).toEqual(['src/use.ts:5=no']);
     expect(verdicts('typescript-errors')).toEqual(['src/use.ts:5=yes']);
   });
 });
