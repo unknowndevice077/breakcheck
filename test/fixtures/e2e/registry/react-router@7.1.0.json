@@ -1,0 +1,15 @@
+{
+  "name": "react-router",
+  "version": "7.1.0",
+  "description": "Declarative routing for React",
+  "repository": {
+    "url": "git+https://github.com/remix-run/react-router.git",
+    "type": "git",
+    "directory": "packages/react-router"
+  },
+  "homepage": "https://github.com/remix-run/react-router#readme",
+  "bugs": {
+    "url": "https://github.com/remix-run/react-router/issues"
+  },
+  "license": "MIT"
+}

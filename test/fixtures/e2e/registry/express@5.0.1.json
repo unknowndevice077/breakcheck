@@ -1,0 +1,14 @@
+{
+  "name": "express",
+  "version": "5.0.1",
+  "description": "Fast, unopinionated, minimalist web framework",
+  "repository": {
+    "url": "git+https://github.com/expressjs/express.git",
+    "type": "git"
+  },
+  "homepage": "http://expressjs.com/",
+  "bugs": {
+    "url": "https://github.com/expressjs/express/issues"
+  },
+  "license": "MIT"
+}

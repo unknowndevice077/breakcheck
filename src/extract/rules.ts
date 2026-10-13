@@ -207,7 +207,8 @@ function classify(input: string, pkg: string): Ident | null {
   }
   if (/^[\w.-]+\.(json|js|cjs|mjs|ts|ya?ml)$/.test(s)) return null; // a file name, not an API
   // package paths, e.g. react-router-dom or next/legacy/image
-  if (s === pkg || s.startsWith(`${pkg}/`) || /^@[\w-]+\/[\w.-]+(\/[\w./-]+)?$/.test(s)) {
+  // Sibling packages (react-router-dom for react-router) are import paths too.
+  if (s === pkg || s.startsWith(`${pkg}/`) || s.startsWith(`${pkg}-`) || /^@[\w-]+\/[\w.-]+(\/[\w./-]+)?$/.test(s)) {
     return s === pkg ? null : { name: s, type: 'import-path' };
   }
   if (/^<\/?([A-Z][\w.]*)[^>]*\/?>$/.test(s)) s = s.replace(/^<\/?([A-Z][\w.]*)[^>]*\/?>$/, '$1');
@@ -225,7 +226,7 @@ function classify(input: string, pkg: string): Ident | null {
     return { name: s, type: 'export' };
   }
   if (/^[a-z]+(-[a-z0-9]+)+$/.test(s)) return { name: s, type: 'config-key' };
-  if (/^["'][\w:/-]+["']$/.test(s)) return { name: s.slice(1, -1), type: 'config-key' };
+  if (/^["'][\w:/-]+["']$/.test(s)) return s.slice(1, -1) === pkg ? null : { name: s.slice(1, -1), type: 'config-key' };
   return null;
 }
 
@@ -248,8 +249,10 @@ function kindOf(text: string, symbols: AffectedSymbol[]): ChangeKind {
 
 function migrationHints(text: string): string[] {
   const hints: string[] = [];
+  const summary = cleanSummary(firstLine(text));
   for (const line of text.split('\n')) {
     const l = cleanSummary(line);
+    if (l === summary && hints.length === 0 && !/\b(use|instead|in favou?r of|replace)\b/i.test(l)) continue;
     if (/\b(use|in favou?r of|replace|instead|migrate|update your|should now|->|→)\b/i.test(l) && l.length > 8) hints.push(l);
     if (hints.length >= 3) break;
   }

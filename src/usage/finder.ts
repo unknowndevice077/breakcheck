@@ -7,6 +7,8 @@ const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/;
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache', 'vendor', '.yarn', '.pnpm-store']);
 const MAX_FILE_BYTES = 1_000_000;
 const MAX_FILES = 20_000;
+/** Receiver names with a fixed conventional meaning (Express/Koa/Fetch style). */
+const CONVENTIONAL_RECEIVERS = new Set(['req', 'res', 'app', 'router', 'request', 'response', 'ctx', 'next']);
 
 export interface FinderOptions {
   contextLines?: number;
@@ -328,6 +330,12 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
               const info = b.named.get(recv);
               const ok = b.namespaces.has(recv) || (info && info.imported === recvName);
               if (!ok) continue;
+            } else if (b.namespaces.has(recv) || b.named.has(recv)) {
+              // `res.json` is an instance method; `express.json` (the package's own export) is not it
+              continue;
+            } else if (CONVENTIONAL_RECEIVERS.has(recvName) && CONVENTIONAL_RECEIVERS.has(recv) && recv !== recvName) {
+              // `app.param` vs `req.param`: conventional names that clearly mean different objects
+              continue;
             }
             add(change, file, pa.getStartLineNumber(), 'symbol', `${recv}.${prop}`);
           }

@@ -1,0 +1,79 @@
+{
+  "extraction": {
+    "breakingChanges": [
+      {
+        "id": "async-request-apis",
+        "summary": "`cookies()`, `headers()` and `draftMode()` are now async and must be awaited.",
+        "kind": "signature",
+        "affectedSymbols": [{ "name": "cookies", "type": "export" }, { "name": "headers", "type": "export" }, { "name": "draftMode", "type": "export" }],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Make the component or handler `async` and `await cookies()`.", "Run `npx @next/codemod@canary next-async-request-api .` to migrate automatically."],
+        "sourceUrl": "https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-your-application/11-upgrading/02-version-15.mdx",
+        "confidence": "high"
+      },
+      {
+        "id": "experimental-edge-runtime",
+        "summary": "`runtime = 'experimental-edge'` is no longer accepted; use `'edge'`.",
+        "kind": "config",
+        "affectedSymbols": [],
+        "searchPatterns": ["experimental-edge"],
+        "fileGlobs": [],
+        "migration": ["Change `export const runtime = 'experimental-edge'` to `'edge'`."],
+        "sourceUrl": "https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-your-application/11-upgrading/02-version-15.mdx",
+        "confidence": "high"
+      },
+      {
+        "id": "nextrequest-geo-ip-removed",
+        "summary": "`NextRequest` no longer has `geo` and `ip`; these come from your hosting provider.",
+        "kind": "removed",
+        "affectedSymbols": [{ "name": "request.geo", "type": "member" }, { "name": "request.ip", "type": "member" }],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["On Vercel, use `geolocation(request)` and `ipAddress(request)` from `@vercel/functions`."],
+        "sourceUrl": "https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-your-application/11-upgrading/02-version-15.mdx",
+        "confidence": "high"
+      },
+      {
+        "id": "next-font-package-removed",
+        "summary": "The `@next/font` package was removed in favour of the built-in `next/font`.",
+        "kind": "removed",
+        "affectedSymbols": [{ "name": "@next/font", "type": "import-path" }],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Import from `next/font/google` or `next/font/local`."],
+        "sourceUrl": "https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-your-application/11-upgrading/02-version-15.mdx",
+        "confidence": "high"
+      },
+      {
+        "id": "react-19-required",
+        "summary": "The App Router now requires React 19.",
+        "kind": "runtime",
+        "affectedSymbols": [],
+        "searchPatterns": [],
+        "fileGlobs": [],
+        "migration": ["Upgrade `react` and `react-dom` to 19."],
+        "sourceUrl": "https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-your-application/11-upgrading/02-version-15.mdx",
+        "confidence": "high"
+      }
+    ]
+  },
+  "verdicts": {
+    "async-request-apis@app/page.tsx:1": { "affected": "no", "reason": "The import itself is still valid; the call site is what changes.", "fix": null },
+    "async-request-apis@app/page.tsx:4": {
+      "affected": "yes",
+      "reason": "Calls `cookies().get()` synchronously; in 15 `cookies()` returns a promise (make `Page` async).",
+      "fix": { "before": "  const theme = cookies().get('theme')?.value ?? 'light';", "after": "  const theme = (await cookies()).get('theme')?.value ?? 'light';" }
+    },
+    "experimental-edge-runtime@app/api/geo/route.ts:3": {
+      "affected": "yes",
+      "reason": "Declares the removed `experimental-edge` runtime.",
+      "fix": { "before": "export const runtime = 'experimental-edge';", "after": "export const runtime = 'edge';" }
+    },
+    "nextrequest-geo-ip-removed@app/api/geo/route.ts:6": {
+      "affected": "yes",
+      "reason": "Reads `request.geo`, which is undefined in Next.js 15.",
+      "fix": { "before": "  const country = request.geo?.country ?? 'unknown';", "after": "  const country = geolocation(request).country ?? 'unknown';" }
+    }
+  }
+}

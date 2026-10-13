@@ -94,7 +94,7 @@ function classify(output: string, code: number | null): ProviderError {
   const text = output.replace(/\s+/g, ' ').trim();
   const tail = text.slice(-300);
   if (/rate.?limit|429|too many requests|quota|credits? (exhausted|exceeded)/i.test(text)) return new ProviderError('rate-limit', `Copilot rate limit or AI-credit allowance reached: ${tail}`);
-  if (/401|403|unauthori[sz]ed|forbidden|not (enabled|entitled|licensed)|no (active )?copilot|copilot-requests|permission|policy/i.test(text)) {
+  if (/401|403|unauthori[sz]ed|forbidden|not (enabled|entitled|licensed)|no (active )?copilot|(?:do not|don.t) have (?:an? )?(?:active )?copilot|copilot (?:subscription|access|seat|license)|copilot-requests|permission|policy/i.test(text)) {
     return new ProviderError('auth', `Copilot is not available to this workflow (needs \`copilot-requests: write\` and a Copilot plan): ${tail}`);
   }
   if (/ENOTFOUND|ECONNRESET|ETIMEDOUT|network|EAI_AGAIN/i.test(text)) return new ProviderError('network', `network error running Copilot CLI: ${tail}`);

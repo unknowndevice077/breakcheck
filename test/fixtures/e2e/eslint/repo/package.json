@@ -1,0 +1,9 @@
+{
+  "name": "tooling",
+  "private": true,
+  "scripts": {
+    "lint": "eslint --ext .js,.ts --format compact src",
+    "lint:ci": "eslint src"
+  },
+  "devDependencies": { "eslint": "^9.0.0" }
+}

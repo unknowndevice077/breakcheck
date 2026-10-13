@@ -1,0 +1,6 @@
+{
+  "name": "api",
+  "private": true,
+  "type": "module",
+  "dependencies": { "express": "^5.0.1" }
+}
