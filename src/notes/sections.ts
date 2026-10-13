@@ -132,7 +132,12 @@ export interface NoteBlock {
   version?: string;
   /** Minimum priority for every section of this block (migration guides are all relevant) */
   priorityFloor?: number;
+  /** Migration guides share the budget with release notes instead of crowding them out */
+  guide?: boolean;
 }
+
+/** Share of the budget migration guides may take before release notes have had their turn */
+const GUIDE_SHARE = 0.5;
 
 interface Chunk {
   block: number;
@@ -153,7 +158,8 @@ export function assembleNotes(blocks: NoteBlock[], budget: number): { text: stri
     splitSections(b.body).forEach((s, si) => {
       const text = s.text.trim();
       if (!text) return;
-      let priority = Math.max(isMajor ? 1 : 0, b.priorityFloor ?? 0);
+      // x.0.0 releases carry the big changes of a multi-major range
+      let priority = Math.max(isMajor ? 2 : 0, b.priorityFloor ?? 0);
       if (PRIORITY_HEADING.test(s.heading)) priority = 3;
       else if (isAutoPrList(text)) priority = Math.min(priority, b.priorityFloor ?? 0);
       else if (BREAKING_LINE.test(text)) priority = Math.max(priority, 2);
@@ -171,21 +177,31 @@ export function assembleNotes(blocks: NoteBlock[], budget: number): { text: stri
   let remaining = budget;
   const keep = new Set<Chunk>();
   const byPriority = [...chunks].sort((a, b) => b.priority - a.priority || a.block - b.block || a.order - b.order);
-  for (const c of byPriority) {
-    if (remaining <= 200) break;
+  // Across several majors a guide covers one of them; it must not crowd out the other x.0.0 notes.
+  const majorReleases = new Set(blocks.filter((b) => b.version && semver.minor(b.version) === 0 && semver.patch(b.version) === 0).map((b) => semver.major(b.version as string)));
+  const isGuide = (c: Chunk) => majorReleases.size > 1 && !!blocks[c.block]?.guide;
+  let guideBudget = budget * GUIDE_SHARE;
+  const take = (c: Chunk, capped: boolean): boolean => {
+    if (remaining <= 200 || keep.has(c)) return false;
     const header = paid.has(c.block) ? 0 : headerCost(c.block);
-    if (c.text.length + 2 + header <= remaining) {
-      keep.add(c);
-      paid.add(c.block);
-      remaining -= c.text.length + 2 + header;
-    } else if (c.priority >= 2 && remaining - header > 300) {
-      const cut = { ...c, text: condense(c.text, remaining - header - 2) };
-      keep.add(cut);
-      paid.add(c.block);
-      chunks.splice(chunks.indexOf(c), 1, cut);
-      remaining = 0;
+    const limit = capped && isGuide(c) ? Math.min(remaining, guideBudget) : remaining;
+    let kept: Chunk | null = null;
+    if (c.text.length + 2 + header <= limit) kept = c;
+    else if (c.priority >= 2 && limit - header > 300 && (!capped || !isGuide(c))) {
+      kept = { ...c, text: condense(c.text, limit - header - 2) };
+      chunks.splice(chunks.indexOf(c), 1, kept);
     }
-  }
+    if (!kept) return false;
+    keep.add(kept);
+    paid.add(c.block);
+    const cost = kept.text.length + 2 + header;
+    remaining -= cost;
+    if (isGuide(c)) guideBudget -= cost;
+    return true;
+  };
+  // First pass: guides capped at their share; second pass: any space left goes to what was skipped.
+  for (const c of byPriority) take(c, true);
+  for (const c of byPriority) if (chunks.includes(c)) take(c, false);
   const kept = chunks.filter((c) => keep.has(c));
   const dropped = chunks.length - kept.length;
   const text = render(blocks, kept) + (dropped ? `\n\n…[${dropped} lower-priority section(s) omitted to fit the size budget]` : '');

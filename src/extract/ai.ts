@@ -59,6 +59,20 @@ export async function extractWithAI(gw: ModelGateway, bump: Bump, notes: Release
     errors = validate(data, extractionSchema);
     if (!errors.length) return normalizeExtraction(data as ExtractionResult);
     gw.markLastInvalid(errors.slice(0, 3).join('; '));
+    // Second answer still off: keep the changes that are well-formed rather than losing them all.
+    if (attempt === 1) {
+      const salvaged = salvage(data);
+      if (salvaged) return salvaged;
+    }
   }
   throw new ProviderError('invalid-response', `model output did not match the schema twice (${errors?.slice(0, 3).join('; ')})`);
+}
+
+/** The well-formed items of an extraction whose other items are malformed; null when none are usable. */
+export function salvage(data: unknown): ExtractionResult | null {
+  const items = (data as { breakingChanges?: unknown } | null)?.breakingChanges;
+  if (!Array.isArray(items)) return null;
+  const itemSchema = (extractionSchema.properties as Record<string, { items: typeof extractionSchema }>).breakingChanges!.items;
+  const good = items.filter((it) => validate(it, itemSchema).length === 0);
+  return good.length ? normalizeExtraction({ breakingChanges: good } as ExtractionResult) : null;
 }
