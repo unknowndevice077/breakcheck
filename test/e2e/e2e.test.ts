@@ -369,8 +369,11 @@ describe('provider failures never fail the run', () => {
     const twice = await execute(express(), { provider: 'anthropic', model: loadModel('express'), anthropic: { unknown: [], invalidFirst: 2 } });
     const pkg = twice.result.report!.packages[0]!;
     expect(pkg.mode).toBe('rules');
-    expect(pkg.fallbackReason).toBe('AI output for express was invalid twice');
-    expect(commentBody(twice.posted)).toContain('Rule-based (no AI available), lower confidence: AI output for express was invalid twice');
+    expect(pkg.fallbackReason).toBe('AI output for express was invalid twice; matches were still checked by the AI');
+    expect(commentBody(twice.posted)).toContain('Rule-based extraction with AI-verified matches, lower confidence: AI output for express was invalid twice');
+    // The model still works, so rule-based matches get real verdicts instead of "possibly"
+    expect(pkg.changes.flatMap((c) => c.hits).some((h) => h.verdict === 'yes' || h.verdict === 'no' || h.verdict === 'unsure')).toBe(true);
+    expect(pkg.changes.flatMap((c) => c.hits).every((h) => h.verdict !== 'possibly')).toBe(true);
   });
 });
 

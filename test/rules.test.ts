@@ -55,8 +55,9 @@ describe('extractByRules on real changelogs', () => {
     const flat = r.breakingChanges.find((c) => /New default config format/.test(c.summary))!;
     expect(flat.fileGlobs).toEqual(['.eslintrc', '.eslintrc.*']);
     expect(byName(r)('--quiet')?.kind).toBe('cli');
-    expect(byName(r)('FlatRuleTester')?.kind).toBe('renamed');
-    expect(byName(r)('RuleTester')).toBeUndefined();
+    const rename = byName(r)('FlatRuleTester')!;
+    expect(rename.kind).toBe('renamed');
+    expect(rename.affectedSymbols.map((s) => s.name)).not.toContain('RuleTester'); // the replacement isn't affected
   });
 
   it('skips non-breaking conventional commits like "chore: remove …"', () => {

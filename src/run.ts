@@ -155,7 +155,14 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Prom
   } catch (e) {
     unanalysed.push(`usage search failed: ${(e as Error).message}`);
   }
-  const verification = await verifyHits(mode === 'ai' ? gateway : disabledGateway(gateway), bump, changes, hits);
+  // If only this package's extraction failed (e.g. invalid output twice) the model is still
+  // usable, so rule-based matches still get a yes/no/unsure verdict instead of "possibly".
+  const verifyWithAI = gateway.available && (mode === 'ai' || !!fallbackReason);
+  if (mode === 'rules' && verifyWithAI) {
+    log(`AI extraction for ${bump.name} failed (${fallbackReason}); using rule-based extraction, AI verification`);
+    fallbackReason = `${fallbackReason}; matches were still checked by the AI`;
+  }
+  const verification = await verifyHits(verifyWithAI ? gateway : disabledGateway(gateway), bump, changes, hits);
   if (verification.error) unanalysed.push(`AI verification failed for some locations, shown as "possibly": ${verification.error}`);
 
   // What was searched and what came of it, for anyone reading the job log.
