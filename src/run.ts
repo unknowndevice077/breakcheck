@@ -1,0 +1,158 @@
+import path from 'node:path/posix';
+import { detectBumps } from './bumps/detect.js';
+import { lockfileKind } from './bumps/lockfiles.js';
+import { extractWithAI } from './extract/ai.js';
+import { cacheKey, type ExtractionCache } from './extract/cache.js';
+import { extractByRules } from './extract/rules.js';
+import type { GitHubApi } from './github.js';
+import { gatherNotes } from './notes/fetch.js';
+import type { Registry } from './notes/registry.js';
+import type { ModelGateway } from './providers/index.js';
+import { ProviderError } from './providers/types.js';
+import { upsertComment } from './report/comment.js';
+import { renderComment, renderNoBumps, tally } from './report/render.js';
+import type { BreakingChange, Bump, ExtractionResult, PackageReport, ReleaseNotes, RunReport, UsageHit } from './types.js';
+import { findUsages } from './usage/finder.js';
+import { verifyHits } from './verify/verify.js';
+
+export interface RunContext {
+  owner: string;
+  repo: string;
+  pr: number;
+  baseSha: string;
+  headSha: string;
+}
+
+export interface RunDeps {
+  gh: GitHubApi;
+  registry: Registry;
+  cache: ExtractionCache;
+  gateway: ModelGateway;
+  /** Checked-out repository to search for usages */
+  workspace: string;
+  /** Why there is no provider, when there is none */
+  providerReason?: string;
+  log?: (msg: string) => void;
+}
+
+export interface RunOptions {
+  includePatch: boolean;
+  maxPackages: number;
+  /** Characters of release notes per package */
+  notesBudget?: number;
+  postComment?: boolean;
+}
+
+export interface RunResult {
+  report: RunReport | null;
+  body: string | null;
+  comment: { id: number; url: string; action: 'created' | 'updated' } | null;
+  affected: number;
+  possible: number;
+}
+
+const isDependencyFile = (f: string) => path.basename(f) === 'package.json' || lockfileKind(f) !== null;
+
+export async function run(ctx: RunContext, deps: RunDeps, opts: RunOptions): Promise<RunResult> {
+  const log = deps.log ?? (() => {});
+  const { gh } = deps;
+  const changed = (await gh.listPullFiles(ctx.owner, ctx.repo, ctx.pr)).filter((f) => isDependencyFile(f) && !f.includes('node_modules/'));
+  log(`Dependency files changed: ${changed.join(', ') || 'none'}`);
+
+  const read = (file: string, side: 'base' | 'head') => gh.getFile(ctx.owner, ctx.repo, file, side === 'base' ? ctx.baseSha : ctx.headSha);
+  const { bumps, skipped } = changed.length ? await detectBumps(changed, read, { includePatch: opts.includePatch }) : { bumps: [], skipped: [] };
+
+  if (!bumps.length) {
+    log(`No bumps to analyse.${skipped.length ? ` Skipped: ${skipped.map((s) => `${s.name} (${s.reason})`).join('; ')}` : ''}`);
+    const comment = opts.postComment === false ? null : await upsertComment(gh, ctx.owner, ctx.repo, ctx.pr, renderNoBumps(), { createIfMissing: false });
+    return { report: null, body: null, comment, affected: 0, possible: 0 };
+  }
+
+  const selected = bumps.slice(0, opts.maxPackages);
+  for (const b of bumps.slice(opts.maxPackages)) skipped.push({ name: b.name, reason: `over the max-packages limit (${opts.maxPackages})` });
+
+  const packages: PackageReport[] = [];
+  for (const bump of selected) {
+    log(`Analysing ${bump.name} ${bump.fromVersion} → ${bump.toVersion} (${bump.bumpType})`);
+    packages.push(await analysePackage(bump, deps, opts));
+  }
+
+  const report: RunReport = {
+    packages,
+    skipped,
+    repo: { owner: ctx.owner, repo: ctx.repo },
+    headSha: ctx.headSha,
+    providerLabel: deps.gateway.label,
+    ...(deps.gateway.failure ? { providerError: deps.gateway.failure } : {}),
+  };
+  const body = renderComment(report);
+  const comment = opts.postComment === false ? null : await upsertComment(gh, ctx.owner, ctx.repo, ctx.pr, body);
+  const t = tally(report);
+  return { report, body, comment, affected: t.affected, possible: t.possible };
+}
+
+async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions): Promise<PackageReport> {
+  const { gateway } = deps;
+  const unanalysed: string[] = [];
+  let notes: ReleaseNotes;
+  try {
+    notes = await gatherNotes(deps.gh, deps.registry, bump, { budget: opts.notesBudget ?? 30_000 });
+  } catch (e) {
+    notes = { repo: null, text: '', sources: [], migrationLinks: [], truncated: false, missingReason: `fetching release notes failed (${(e as Error).message})` };
+  }
+
+  // Extraction: cache → AI → rules
+  let mode: PackageReport['mode'] = gateway.available ? 'ai' : 'rules';
+  let fallbackReason: string | undefined = gateway.available ? undefined : (gateway.failure ?? deps.providerReason);
+  let fromCache = false;
+  let extraction: ExtractionResult = { breakingChanges: [] };
+  if (notes.text) {
+    if (gateway.available && gateway.label) {
+      const key = cacheKey({ pkg: bump.name, from: bump.fromVersion, to: bump.toVersion, label: gateway.label });
+      const cached = await deps.cache.get(key);
+      if (cached) {
+        extraction = cached;
+        fromCache = true;
+      } else {
+        try {
+          extraction = await extractWithAI(gateway, bump, notes);
+          await deps.cache.set(key, extraction);
+        } catch (e) {
+          mode = 'rules';
+          fallbackReason = e instanceof ProviderError && e.kind === 'invalid-response' ? `AI output for ${bump.name} was invalid twice` : (gateway.failure ?? (e as Error).message);
+        }
+      }
+    }
+    if (mode === 'rules') extraction = extractByRules(notes.text, bump.name);
+  }
+  const changes: BreakingChange[] = extraction.breakingChanges;
+
+  // Usage search (deterministic) and verification (AI only)
+  let hits = new Map<string, UsageHit[]>();
+  try {
+    const found = findUsages(deps.workspace, bump.name, changes);
+    hits = found.hits;
+    unanalysed.push(...found.unanalysed);
+    if (!found.importingFiles.length && changes.length) unanalysed.push(`no source file imports ${bump.name} (config files and scripts were still checked)`);
+  } catch (e) {
+    unanalysed.push(`usage search failed: ${(e as Error).message}`);
+  }
+  const verification = await verifyHits(mode === 'ai' ? gateway : disabledGateway(gateway), bump, changes, hits);
+  if (verification.error) unanalysed.push(`AI verification failed for some locations, shown as "possibly": ${verification.error}`);
+
+  return {
+    bump,
+    notes,
+    mode,
+    ...(mode === 'ai' && gateway.label ? { modelLabel: gateway.label } : {}),
+    ...(mode === 'rules' && fallbackReason ? { fallbackReason } : {}),
+    changes: changes.map((change) => ({ change, hits: verification.verified.get(change.id) ?? [] })),
+    unanalysed,
+    fromCache,
+  };
+}
+
+/** A view of the gateway that reports itself unavailable, so verification runs in rule-based mode. */
+function disabledGateway(gw: ModelGateway): ModelGateway {
+  return Object.create(gw, { available: { get: () => false } }) as ModelGateway;
+}
