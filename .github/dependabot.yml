@@ -1,0 +1,10 @@
+# Dogfooding: Dependabot keeps the demo app's dependencies current, and breakcheck
+# (via .github/workflows/breakcheck.yml) comments on its PRs. Scoped to the demo
+# app only; delete this file to stop it.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /examples/demo-app
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
