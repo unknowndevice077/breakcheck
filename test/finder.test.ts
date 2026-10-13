@@ -189,3 +189,25 @@ describe('privacy guards', () => {
     expect(snippet(lines, 3, 10).text).not.toContain('ghp_');
   });
 });
+
+describe('findUsages: single-file components', () => {
+  const components = new URL('./fixtures/projects/components/', import.meta.url).pathname;
+
+  it('parses <script> blocks in .vue and .astro frontmatter with original line numbers', () => {
+    const res = findUsages(components, 'vue-router', [
+      change('use-router', { affectedSymbols: [{ name: 'useRouter', type: 'export' }] }),
+      change('hash', { affectedSymbols: [{ name: 'createWebHashHistory', type: 'export' }] }),
+    ]);
+    expect(res.importingFiles).toEqual(['src/Nav.vue', 'src/Page.astro']);
+    expect(where(res.hits.get('use-router'))).toEqual(['src/Nav.vue:8', 'src/Nav.vue:9', 'src/Page.astro:2', 'src/Page.astro:3']);
+    expect(where(res.hits.get('hash'))).toEqual(['src/Nav.vue:8', 'src/Nav.vue:10']);
+    expect(res.hits.get('hash')![0]!.matched).toBe('createWebHashHistory as hash');
+  });
+
+  it('follows bindings across the two <script> blocks of a .svelte file', () => {
+    const res = findUsages(components, '@tanstack/query-core', [
+      change('cancel', { affectedSymbols: [{ name: 'QueryClient.cancelQueries', type: 'member' }] }),
+    ]);
+    expect(where(res.hits.get('cancel'))).toEqual(['src/List.svelte:7']);
+  });
+});

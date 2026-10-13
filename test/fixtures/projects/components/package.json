@@ -1,0 +1,1 @@
+{ "name": "components", "dependencies": { "vue-router": "^4.0.0", "@tanstack/query-core": "^4.0.0" } }
