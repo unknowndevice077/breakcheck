@@ -241,3 +241,40 @@ describe('detectBumps: npm aliases', () => {
     expect(bumps).toEqual([{ name: 'http', packageName: 'axios', fromVersion: '0.28.1', toVersion: '1.7.9', bumpType: 'major', manifests: ['package.json'], depTypes: ['dependencies'] }]);
   });
 });
+
+describe('detectBumps: npm aliases in pnpm and yarn lockfiles', () => {
+  const manifests = { base: pkg({ http: 'npm:axios@^0.28.1' }), head: pkg({ http: 'npm:axios@^1.7.0' }) };
+
+  it('reads pnpm v9 alias versions written as name@version', async () => {
+    const lock = (spec: string, v: string) => `lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n      http:\n        specifier: ${spec}\n        version: axios@${v}\n`;
+    const read = repo(
+      { 'package.json': manifests.base, 'pnpm-lock.yaml': lock('npm:axios@^0.28.1', '0.28.4') },
+      { 'package.json': manifests.head, 'pnpm-lock.yaml': lock('npm:axios@^1.7.0', '1.7.9') },
+    );
+    const { bumps } = await detectBumps(['package.json', 'pnpm-lock.yaml'], read, { includePatch: false });
+    expect(bumps.map((b) => [b.name, b.packageName, b.fromVersion, b.toVersion])).toEqual([['http', 'axios', '0.28.4', '1.7.9']]);
+  });
+
+  it('reads pnpm v6 alias versions written as /name/version', async () => {
+    const lock = (spec: string, v: string) => `lockfileVersion: '6.0'\ndependencies:\n  http:\n    specifier: ${spec}\n    version: /axios@${v}\n`;
+    const read = repo(
+      { 'package.json': manifests.base, 'pnpm-lock.yaml': lock('npm:axios@^0.28.1', '0.28.4') },
+      { 'package.json': manifests.head, 'pnpm-lock.yaml': lock('npm:axios@^1.7.0', '1.7.9') },
+    );
+    const { bumps } = await detectBumps(['package.json', 'pnpm-lock.yaml'], read, { includePatch: false });
+    expect(bumps.map((b) => [b.fromVersion, b.toVersion])).toEqual([['0.28.4', '1.7.9']]);
+  });
+
+  it('reads yarn classic and berry alias descriptors', async () => {
+    const classic = (spec: string, v: string) => `# yarn lockfile v1\n\n"http@npm:axios@${spec}":\n  version "${v}"\n  resolved "https://registry.yarnpkg.com/axios/-/axios-${v}.tgz"\n`;
+    const berry = (spec: string, v: string) => `__metadata:\n  version: 8\n\n"http@npm:axios@${spec}":\n  version: ${v}\n  resolution: "axios@npm:${v}"\n`;
+    for (const lock of [classic, berry]) {
+      const read = repo(
+        { 'package.json': manifests.base, 'yarn.lock': lock('^0.28.1', '0.28.4') },
+        { 'package.json': manifests.head, 'yarn.lock': lock('^1.7.0', '1.7.9') },
+      );
+      const { bumps } = await detectBumps(['package.json', 'yarn.lock'], read, { includePatch: false });
+      expect(bumps.map((b) => [b.name, b.packageName, b.fromVersion, b.toVersion])).toEqual([['http', 'axios', '0.28.4', '1.7.9']]);
+    }
+  });
+});

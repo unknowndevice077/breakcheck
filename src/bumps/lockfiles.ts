@@ -29,9 +29,10 @@ export interface Lockfile {
 
 function cleanVersion(v: unknown): string | null {
   if (typeof v !== 'string') return null;
-  // pnpm: "1.2.3(react@18.2.0)" / "1.2.3_react@18.2.0"; npm aliases: "npm:foo@1.2.3"
+  // pnpm: "1.2.3(react@18.2.0)" / "1.2.3_react@18.2.0"; npm aliases: "npm:foo@1.2.3",
+  // pnpm v9 aliases "foo@1.2.3", pnpm v6 aliases "/foo@1.2.3" or "/foo/1.2.3"
   let s = v.replace(/\(.*$/, '').replace(/_.*$/, '');
-  const alias = s.match(/^npm:(?:@[^/]+\/)?[^@]+@(.+)$/);
+  const alias = s.match(/^(?:npm:|\/)?(?:@[^/]+\/)?[^@/]+[@/]([^@/]+)$/);
   if (alias?.[1]) s = alias[1];
   return semver.valid(s);
 }
@@ -123,10 +124,12 @@ function parseYarn(content: string): Lockfile {
     const version = cleanVersion(entry.version);
     if (!version) continue;
     for (const descriptor of rawKey.split(/,\s*/)) {
-      const at = descriptor.lastIndexOf('@');
+      // Split at the first @ after the scope: "http@npm:axios@^1" is the alias http, range axios@^1
+      const unquoted = descriptor.replace(/^"/, '');
+      const at = unquoted.indexOf('@', 1);
       if (at <= 0) continue;
-      const name = descriptor.slice(0, at).replace(/^"|"$/g, '');
-      const range = descriptor.slice(at + 1).replace(/^npm:/, '').replace(/"$/, '');
+      const name = unquoted.slice(0, at);
+      const range = unquoted.slice(at + 1).replace(/^npm:/, '').replace(/"$/, '');
       const list = byName.get(name) ?? [];
       let item = list.find((i) => i.version === version);
       if (!item) {
