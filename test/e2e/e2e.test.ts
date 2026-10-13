@@ -488,7 +488,7 @@ describe('caching and comment lifecycle', () => {
     const cache = createMemoryCache();
     const first = await execute(express(), { provider: 'anthropic', model: loadModel('express'), cache });
     expect(first.gateway.calls.some((c) => c.purpose.startsWith('extract'))).toBe(true);
-    expect([...cache.store.keys()]).toEqual(['breakcheck-v2-anthropic/claude-opus-5-5-express-4.21.2-5.0.1']);
+    expect([...cache.store.keys()]).toEqual(['breakcheck-v3-anthropic/claude-opus-5-5-express-4.21.2-5.0.1']);
     const second = await execute(express(), { provider: 'anthropic', model: loadModel('express'), cache });
     expect(second.gateway.calls.some((c) => c.purpose.startsWith('extract'))).toBe(false);
     expect(second.result.report!.packages[0]!.fromCache).toBe(true);

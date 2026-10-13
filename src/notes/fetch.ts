@@ -88,7 +88,7 @@ export async function gatherNotes(gh: GitHubApi, registry: Registry, bump: Bump,
   if (bump.bumpType === 'major') {
     const majors = majorsCrossed(from, to);
     if (semver.major(from) === 0) majors.push(0);
-    const guides = pickMigrationGuides(paths, repo.directory, majors, semver.major(from));
+    const guides = pickMigrationGuides(paths, repo.directory, majors, semver.major(from), bump.packageName ?? bump.name);
     // Guides linked from the notes that live in the same GitHub repo can be read directly.
     for (const link of migrationLinks) {
       const m = link.match(/^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/blob\/([^/]+)\/(.+\.mdx?)$/);
@@ -98,7 +98,7 @@ export async function gatherNotes(gh: GitHubApi, registry: Registry, bump: Bump,
       const content = await gh.getFile(owner, r, g, ref);
       if (!content) continue;
       const url = `https://github.com/${owner}/${r}/blob/${ref ?? 'HEAD'}/${g}`;
-      blocks.push({ title: `Migration guide ${g}`, url, body: content, priorityFloor: 3 });
+      blocks.push({ title: `Migration guide ${g}`, url, body: content, priorityFloor: 3, guide: true });
       sources.push({ kind: 'migration-guide', url, title: g });
       migrationLinks.delete(url);
     }
@@ -182,30 +182,48 @@ export function pickChangelog(paths: string[], directory?: string): string | nul
  * `docs/src/use/migrate-to-9.0.0.md`, `docs/upgrading/v6.md` (upgrading *from* v6),
  * `.../upgrading/02-version-15.mdx`, or a root `MIGRATION.md`.
  */
-export function pickMigrationGuides(paths: string[], directory: string | undefined, majors: number[], fromMajor: number): string[] {
+export function pickMigrationGuides(paths: string[], directory: string | undefined, majors: number[], fromMajor: number, pkg = ''): string[] {
   const scored: { p: string; score: number; base: number }[] = [];
+  const pkgTokens = new Set(pkg.toLowerCase().split(/[@/._-]+/).filter((t) => t.length > 2));
   for (const p of paths) {
     if (!/\.mdx?$/i.test(p) || /(^|\/)(node_modules|test|tests|__tests__|fixtures|examples?)\//i.test(p) || /changelog/i.test(p)) continue;
+    // A directory named for a version ("docs-v3/", "v5/") documents that version only.
+    const dirVersions = [...path.dirname(p).matchAll(/(?:^|[-_/])v(\d+)(?=$|[-_/])/gi)].map((m) => Number(m[1]));
+    if (dirVersions.some((n) => !majors.includes(n))) continue;
     let score: number;
     if (MIGRATION_NAMES.test(p)) score = 5;
     else if (/migrat|upgrad/i.test(p)) {
       const stem = path.basename(p).replace(/\.mdx?$/i, '');
-      const nums = [...stem.matchAll(/(?:^|[^0-9.])(?:v|version-?|to-)?(\d+)(?:\.0\.0|\.x)?(?=$|[^0-9.])/gi)].map((m) => Number(m[1]));
+      // "migrate-from-v5-to-v6" is about v6 only
+      const target = stem.match(/(?:^|[^a-z])to-?v?(\d+)(?=$|[^0-9])/i)?.[1];
+      const nums = target
+        ? [Number(target)]
+        : [...stem.matchAll(/(?:^|[^0-9.])(?:v|version-?)?(\d+)(?:\.0\.0|\.x)?(?=$|[^0-9.])/gi)].map((m) => Number(m[1]));
       const leading = stem.match(/^(\d+)-/)?.[1]; // "02-version-15" → 02 is just an ordering prefix
-      const relevant = nums.filter((n, i) => !(i === 0 && leading && n === Number(leading)));
+      const relevant = target ? nums : nums.filter((n, i) => !(i === 0 && leading && n === Number(leading)));
       if (relevant.some((n) => majors.includes(n))) score = 4;
-      else if (relevant.includes(fromMajor) && /upgrad/i.test(p)) score = 3;
+      else if (!target && relevant.includes(fromMajor) && /upgrad/i.test(p)) score = 3;
       else continue;
     } else continue;
     const base = score;
     if (directory && p.startsWith(`${directory}/`)) score += 1;
     if (/(^|\/)docs?\//i.test(p)) score += 0.5;
+    // docs/framework/react/... for @tanstack/react-query
+    if (path.dirname(p).toLowerCase().split('/').some((seg) => pkgTokens.has(seg))) score += 0.75;
     scored.push({ p, score, base });
   }
   // "upgrading/v6" (= from v6) is only a fallback when no guide names the target major.
   const hasTargetGuide = scored.some((s) => s.base >= 4);
+  // The same guide per framework (react/, vue/, svelte/...) says the same thing: read one.
+  const seen = new Set<string>();
   return scored
     .filter((s) => !hasTargetGuide || s.base !== 3)
     .sort((a, b) => b.score - a.score || a.p.length - b.p.length)
+    .filter((s) => {
+      const name = path.basename(s.p).toLowerCase();
+      if (seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    })
     .map((s) => s.p);
 }

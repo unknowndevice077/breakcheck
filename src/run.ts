@@ -159,6 +159,7 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions, extra
           await deps.cache.set(key, extraction);
         } catch (e) {
           mode = 'rules';
+          log(`AI extraction for ${bump.name} failed: ${(e as Error).message}`);
           fallbackReason = e instanceof ProviderError && e.kind === 'invalid-response' ? `AI output for ${bump.name} was invalid twice` : (gateway.failure ?? (e as Error).message);
         }
       }

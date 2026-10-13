@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractionSchema } from '../src/extract/schema.js';
+import { salvage } from '../src/extract/ai.js';
 import { createAnthropicProvider } from '../src/providers/anthropic.js';
 import { createCopilotProvider } from '../src/providers/copilot.js';
 import { createProvider, ModelGateway } from '../src/providers/index.js';
@@ -142,5 +143,17 @@ describe('fixMatchesSnippet', () => {
   });
   it('rejects invented "before" code', () => {
     expect(fixMatchesSnippet('const theme = headers();', snippet)).toBe(false);
+  });
+});
+
+describe('salvage (extraction whose retry is still partly malformed)', () => {
+  const good = { id: 'a', summary: 'A was removed', kind: 'removed', affectedSymbols: [{ name: 'A', type: 'export' }], searchPatterns: [], fileGlobs: [], migration: [], sourceUrl: null, confidence: 'high' };
+  it('keeps well-formed changes and drops the rest', () => {
+    const r = salvage({ breakingChanges: [good, { id: 'b', summary: 'missing fields' }] });
+    expect(r?.breakingChanges.map((c) => c.id)).toEqual(['a']);
+  });
+  it('gives up when nothing is usable', () => {
+    expect(salvage({ breakingChanges: [{ id: 'b' }] })).toBeNull();
+    expect(salvage('not json')).toBeNull();
   });
 });
