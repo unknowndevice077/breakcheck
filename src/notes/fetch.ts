@@ -139,7 +139,7 @@ export function pickChangelog(paths: string[], directory?: string): string | nul
  * `.../upgrading/02-version-15.mdx`, or a root `MIGRATION.md`.
  */
 export function pickMigrationGuides(paths: string[], directory: string | undefined, majors: number[], fromMajor: number): string[] {
-  const scored: { p: string; score: number }[] = [];
+  const scored: { p: string; score: number; base: number }[] = [];
   for (const p of paths) {
     if (!/\.mdx?$/i.test(p) || /(^|\/)(node_modules|test|tests|__tests__|fixtures|examples?)\//i.test(p) || /changelog/i.test(p)) continue;
     let score = 0;
@@ -153,14 +153,15 @@ export function pickMigrationGuides(paths: string[], directory: string | undefin
       else if (relevant.includes(fromMajor) && /upgrad/i.test(p)) score = 3;
       else continue;
     } else continue;
+    const base = score;
     if (directory && p.startsWith(`${directory}/`)) score += 1;
     if (/(^|\/)docs?\//i.test(p)) score += 0.5;
-    scored.push({ p, score });
+    scored.push({ p, score, base });
   }
   // "upgrading/v6" (= from v6) is only a fallback when no guide names the target major.
-  const hasTargetGuide = scored.some((s) => Math.floor(s.score) >= 4);
+  const hasTargetGuide = scored.some((s) => s.base >= 4);
   return scored
-    .filter((s) => !hasTargetGuide || Math.floor(s.score) !== 3)
+    .filter((s) => !hasTargetGuide || s.base !== 3)
     .sort((a, b) => b.score - a.score || a.p.length - b.p.length)
     .map((s) => s.p);
 }
