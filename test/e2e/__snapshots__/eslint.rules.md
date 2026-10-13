@@ -75,7 +75,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 
 **eslint** (rule-based, low confidence, notes truncated)
 
-- Node.js < v18.18, v19 are no longer supported — _nothing to search for automatically; review manually_ ([source](https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md))
+- Node.js &lt; v18.18, v19 are no longer supported — _nothing to search for automatically; review manually_ ([source](https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md))
 - New default config format (`eslint.config.js`) — _possibly affects this repo_ ([source](https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md))
 - Removed multiple formatters — _no usages found_ ([source](https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md))
 - Removed `require-jsdoc` and `valid-jsdoc` rules — _possibly affects this repo_ ([source](https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md))

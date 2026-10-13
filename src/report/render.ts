@@ -44,8 +44,26 @@ function code(s: string): string {
   return '`' + s.replace(/`/g, 'ˋ') + '`';
 }
 
-function esc(s: string): string {
-  return s.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+/**
+ * Make model- or release-note-derived text safe for a one-line Markdown context.
+ * Outside code spans: `@user` / `@org/team` become code (no notifications to strangers
+ * thanked in release notes), `<` and `>` are escaped (so `useFetcher<Data>` isn't eaten
+ * as an HTML tag), and table pipes are escaped.
+ */
+export function esc(s: string): string {
+  return s
+    .replace(/\r?\n/g, ' ')
+    .split(/(`[^`]*`)/)
+    .map((part) =>
+      /^`[^`]*`$/.test(part)
+        ? part
+        : part
+            .replace(/(^|[^\w`/.])@([A-Za-z0-9][\w.-]*(?:\/[\w.-]+)?)/g, '$1`@$2`')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;'),
+    )
+    .join('')
+    .replace(/\|/g, '\\|');
 }
 
 /** Markdown is not rendered inside <summary>, so turn `code` spans into <code> and escape the rest. */
@@ -54,7 +72,11 @@ export function inlineHtml(s: string): string {
   return s
     .replace(/\r?\n/g, ' ')
     .split(/(`[^`]+`)/)
-    .map((part) => (/^`[^`]+`$/.test(part) ? `<code>${escape(part.slice(1, -1))}</code>` : escape(part)))
+    .map((part) =>
+      /^`[^`]+`$/.test(part)
+        ? `<code>${escape(part.slice(1, -1))}</code>`
+        : escape(part).replace(/(^|[^\w/.])@([A-Za-z0-9][\w.-]*(?:\/[\w.-]+)?)/g, '$1<code>@$2</code>'),
+    )
     .join('');
 }
 
@@ -116,7 +138,7 @@ function changeSection(run: RunReport, p: PackageReport, c: ChangeReport): strin
   const ruledOut = c.hits.filter((h) => h.verdict === 'no').length;
   if (ruledOut) lines.push(`- ${plural(ruledOut, 'other match', 'other matches')} checked and ruled out by the model`);
   const steps = c.change.migration.filter((m) => m !== c.change.summary);
-  if (steps.length) lines.push('', '**How to migrate**', '', ...steps.map((m, i) => `${i + 1}. ${m}`));
+  if (steps.length) lines.push('', '**How to migrate**', '', ...steps.map((m, i) => `${i + 1}. ${esc(m)}`));
   if (c.change.sourceUrl) lines.push('', `Source: ${c.change.sourceUrl}`);
   lines.push('', '</details>');
   return lines.join('\n');
@@ -163,7 +185,7 @@ export function renderComment(run: RunReport): string {
 
   if (t.missing.length) {
     out.push('### Release notes not found', '');
-    for (const p of t.missing) out.push(`- ${code(p.bump.name)} ${p.bump.fromVersion} → ${p.bump.toVersion}: ${p.notes.missingReason}. Review the upgrade manually.`);
+    for (const p of t.missing) out.push(`- ${code(p.bump.name)} ${p.bump.fromVersion} → ${p.bump.toVersion}: ${esc(p.notes.missingReason ?? '')}. Review the upgrade manually.`);
     out.push('');
   }
 
