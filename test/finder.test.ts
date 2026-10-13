@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { componentScript, findUsages, globToRegex, snippet } from '../src/usage/finder.js';
+import { componentScript, findUsages, globToRegex, listRepoFiles, scopeFiles, snippet } from '../src/usage/finder.js';
 import type { BreakingChange } from '../src/types.js';
 
 const root = new URL('./fixtures/projects/usage/', import.meta.url).pathname;
@@ -247,5 +247,30 @@ describe('findUsages: the package name as a search pattern', () => {
     const res = findUsages(root, 'react-router', [change('arity', { kind: 'behavior', searchPatterns: ['react-router', "'react-router'", '/react-router/', '/react\\-router/i'] })]);
     expect(res.hits.get('arity')).toEqual([]);
     expect(res.diagnostics).toContain('arity: ignored search pattern `react-router` (the package name)');
+  });
+});
+
+describe('scopeFiles (monorepos)', () => {
+  it('keeps the bumping project and drops nested projects that do not use the package', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const dir = mkdtempSync(`${tmpdir()}/scope-`);
+    const put = (f: string, text: string) => {
+      mkdirSync(`${dir}/${f}`.replace(/\/[^/]+$/, ''), { recursive: true });
+      writeFileSync(`${dir}/${f}`, text);
+    };
+    put('package.json', '{"devDependencies":{"typescript":"5"}}');
+    put('examples/app/package.json', '{"dependencies":{"express":"5"}}');
+    put('examples/app/src/server.js', '');
+    put('examples/app/sub/package.json', '{"dependencies":{"express":"5"}}');
+    put('examples/app/sub/x.js', '');
+    put('test/fixtures/repo/package.json', '{"dependencies":{"other":"1"}}');
+    put('test/fixtures/repo/server.js', '');
+    put('src/index.ts', '');
+    const files = listRepoFiles(dir);
+    expect(scopeFiles(dir, files, 'express', ['examples/app/package.json'])).toEqual(['examples/app/package.json', 'examples/app/src/server.js', 'examples/app/sub/package.json', 'examples/app/sub/x.js']);
+    // a root manifest covers the repo, minus nested projects that don't declare the package
+    expect(scopeFiles(dir, files, 'typescript', ['package.json'])).toEqual(['examples/app/src/server.js', 'package.json', 'src/index.ts'].filter((f) => !f.startsWith('examples')));
+    expect(scopeFiles(dir, files, 'x', undefined)).toBe(files);
   });
 });
