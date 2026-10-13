@@ -121,6 +121,8 @@ export interface NoteBlock {
   url: string;
   body: string;
   version?: string;
+  /** Minimum priority for every section of this block (migration guides are all relevant) */
+  priorityFloor?: number;
 }
 
 interface Chunk {
@@ -142,7 +144,7 @@ export function assembleNotes(blocks: NoteBlock[], budget: number): { text: stri
     splitSections(b.body).forEach((s, si) => {
       const text = s.text.trim();
       if (!text) return;
-      let priority = isMajor ? 1 : 0;
+      let priority = Math.max(isMajor ? 1 : 0, b.priorityFloor ?? 0);
       if (PRIORITY_HEADING.test(s.heading)) priority = 3;
       else if (BREAKING_LINE.test(text)) priority = Math.max(priority, 2);
       chunks.push({ block: bi, order: si, text, priority });
