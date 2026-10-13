@@ -105,7 +105,7 @@ Source: https://github.com/remix-run/react-router/releases/tag/react-router%407.
 - Upgrade to v7 — _possibly affects this repo_ ([source](https://github.com/remix-run/react-router/blob/react-router@7.1.0/docs/upgrading/v6.md))
 - Remove duplicate `RouterProvider` impliementations — _no usages found_ ([source](https://github.com/remix-run/react-router/releases/tag/react-router%407.0.0))
 - Remove unstable upload handler. — _nothing to search for automatically; review manually_ ([source](https://github.com/remix-run/react-router/releases/tag/react-router%407.0.0))
-- Remove unneeded dependency on @web3-storage/multipart-parser — _nothing to search for automatically; review manually_ ([source](https://github.com/remix-run/react-router/releases/tag/react-router%407.0.0))
+- Remove unneeded dependency on `@web3-storage/multipart-parser` — _nothing to search for automatically; review manually_ ([source](https://github.com/remix-run/react-router/releases/tag/react-router%407.0.0))
 - Remove the deprecated `json` utility — _possibly affects this repo_ ([source](https://github.com/remix-run/react-router/releases/tag/react-router%407.0.0))
 - Remove unneeded dependency on source-map — _nothing to search for automatically; review manually_ ([source](https://github.com/remix-run/react-router/releases/tag/react-router%407.0.0))
 - Remove `<Link prefetch>` warning which suffers from false positives in a lazy route discovery world — _no usages found_ ([source](https://github.com/remix-run/react-router/releases/tag/react-router%407.1.0))
