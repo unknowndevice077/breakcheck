@@ -9,7 +9,7 @@ export function renderSummary(run: RunReport, calls: CallRecord[], github: { req
   for (const p of run.packages) {
     const mode = p.mode === 'ai' ? `AI (${p.modelLabel})${p.fromCache ? ', cached' : ''}` : `rule-based${p.fallbackReason ? ` (${p.fallbackReason})` : ''}`;
     const from = p.notes.sources.map((s) => `[${s.title}](${s.url})`).join(', ') || p.notes.missingReason || '–';
-    out.push(`| ${p.bump.name} | ${p.bump.fromVersion} → ${p.bump.toVersion} | ${mode.replace(/\|/g, '\\|')} | ${p.changes.length} | ${from.replace(/\|/g, '\\|')} |`);
+    out.push(`| ${p.bump.name}${p.bump.packageName ? ` (${p.bump.packageName})` : ''} | ${p.bump.fromVersion} → ${p.bump.toVersion} | ${mode.replace(/\|/g, '\\|')} | ${p.changes.length} | ${from.replace(/\|/g, '\\|')} |`);
   }
   out.push('');
   if (run.skipped.length) out.push(`Skipped: ${run.skipped.map((s) => `${s.name} (${s.reason})`).join('; ')}`, '');
@@ -27,7 +27,8 @@ export function renderSummary(run: RunReport, calls: CallRecord[], github: { req
         `| ${i + 1} | ${c.provider}/${c.model} | ${c.purpose} | ${c.ok ? 'ok' : `failed: ${(c.error ?? '').replace(/\|/g, '\\|').slice(0, 160)}`} | ${(c.ms / 1000).toFixed(1)}s | ${c.inputTokens ?? 'n/a'} | ${c.outputTokens ?? 'n/a'} |`,
       );
     });
-    out.push('', `Total tokens reported by the provider: ${tin} in / ${tout} out${calls.some((c) => c.inputTokens === undefined) ? ' (Copilot CLI does not report token usage)' : ''}.`);
+    const reported = calls.some((c) => c.inputTokens !== undefined);
+    out.push('', reported ? `Total tokens reported by the provider: ${tin} in / ${tout} out.` : 'Token usage: not reported by this provider (the Copilot CLI does not expose it).');
   }
   if (run.providerError) out.push('', `> AI provider problem: ${run.providerError}. Fell back to rule-based mode.`);
   out.push('', `GitHub API requests: ${github.requests}${github.rateLimited ? ` (${github.rateLimited} rate-limited and retried)` : ''}.`);
