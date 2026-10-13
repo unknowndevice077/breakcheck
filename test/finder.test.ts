@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findUsages, globToRegex, snippet } from '../src/usage/finder.js';
+import { componentScript, findUsages, globToRegex, snippet } from '../src/usage/finder.js';
 import type { BreakingChange } from '../src/types.js';
 
 const root = new URL('./fixtures/projects/usage/', import.meta.url).pathname;
@@ -223,5 +223,21 @@ describe('findUsages: component templates and Vue global properties', () => {
   it('leaves $-globals alone when nothing in the repo uses the package', () => {
     const none = findUsages(components, 'vue-i18n-not-installed', [change('tc', { affectedSymbols: [{ name: '$tc', type: 'member' }] })]);
     expect(none.hits.get('tc')).toEqual([]);
+  });
+});
+
+describe('componentScript', () => {
+  it('handles > inside attribute values (Vue generic="T extends Record<K, V>")', () => {
+    const r = componentScript('a.vue', `<script setup lang="ts" generic="T extends Record<string, number>">\nimport { x } from 'p'\n</script>\n<template><p>{{ x }}</p></template>`);
+    const lines = r.text.split('\n');
+    expect(lines[1]).toBe("import { x } from 'p'");
+    expect([lines[0], lines[2], lines[3]].every((l) => !l?.trim())).toBe(true);
+  });
+
+  it('skips JSON and template script blocks', () => {
+    const r = componentScript('a.astro', `---\nimport A from 'a'\n---\n<script type="application/json">{"b": 1}</script>\n<script>import C from 'c'</script>`);
+    expect(r.text).toContain("import A from 'a'");
+    expect(r.text).toContain("import C from 'c'");
+    expect(r.text).not.toContain('"b"');
   });
 });

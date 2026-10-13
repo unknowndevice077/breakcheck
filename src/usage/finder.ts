@@ -78,11 +78,12 @@ export function componentScript(file: string, text: string): { text: string; ext
     const fm = /^\s*---[^\n]*\n([\s\S]*?)\n---/.exec(text);
     if (fm?.[1] !== undefined) keep.push([fm.index + fm[0].indexOf(fm[1]), fm.index + fm[0].indexOf(fm[1]) + fm[1].length]);
   }
-  for (const m of text.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
+  // Attribute values may contain `>` (Vue `generic="T extends Record<K, V>"`)
+  for (const m of text.matchAll(/<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script\s*>/gi)) {
     const attrs = m[1] ?? '';
     if (/\btype\s*=\s*["']?(?!module|text\/javascript|text\/typescript)[\w/+-]/i.test(attrs)) continue; // JSON, templates, ...
     if (/\blang\s*=\s*["']?[jt]sx\b/i.test(attrs)) ext = 'tsx';
-    const start = (m.index ?? 0) + m[0].indexOf('>') + 1;
+    const start = (m.index ?? 0) + '<script'.length + attrs.length + 1;
     keep.push([start, start + (m[2] ?? '').length]);
   }
   let out = '';
