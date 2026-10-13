@@ -1,4 +1,4 @@
-name: 'breakcheck'
+name: 'breakcheck: dependency upgrade impact'
 description: 'Tells you which breaking changes in a dependency upgrade actually hit your code, where, and how to fix them.'
 author: 'unknowndevice077'
 branding:
