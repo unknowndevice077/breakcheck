@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: unknowndevice077/breakcheck@v0
+      - uses: unknowndevice077/breakcheck@v1
 ```
 
 That's it. No secrets to create.
@@ -81,7 +81,7 @@ GitHub's cache is scoped by branch. A PR can read caches created on its own bran
 ### Switching providers
 
 ```yaml
-      - uses: unknowndevice077/breakcheck@v0
+      - uses: unknowndevice077/breakcheck@v1
         with:
           provider: anthropic            # or openai
           api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -94,7 +94,7 @@ Workflows triggered by Dependabot run with restrictions:
 
 - **The `GITHUB_TOKEN` is read-only by default.** GitHub documents that the workflow's `permissions:` block can raise it. Keep `pull-requests: write` in the workflow, as in the quick start, or breakcheck cannot comment.
 - **Only *Dependabot secrets* are available. Actions secrets are not.** If you use `anthropic` or `openai`, store the key under *Settings → Secrets and variables → Dependabot* too, with the same name as the Actions secret.
-- **Copilot on Dependabot runs.** GitHub's docs don't say whether `copilot-requests: write` is honoured for Dependabot-triggered runs, and I could not verify it. If it isn't, breakcheck falls back to rule-based mode and the comment says why.
+- **Copilot on Dependabot runs works.** `copilot-requests: write` is honoured on Dependabot-triggered runs; this was tested on a real Dependabot PR (express 4 → 5). If Copilot is ever unavailable, breakcheck falls back to rule-based mode and the comment says why.
 - **Re-runs keep the original privileges.** Re-running a Dependabot workflow uses Dependabot's token even when someone else clicks "Re-run".
 
 PRs from forks get a read-only token that `permissions:` cannot raise, so breakcheck cannot comment there. It logs a warning instead of failing.
@@ -159,10 +159,6 @@ Not in v1:
 - More ecosystems: Maven/Gradle, pip, Go modules
 - Committing suggested fixes automatically
 - A hosted GitHub App version
-
-## Name
-
-`breakcheck` is a working name. It is free on npm, and a web search found no Marketplace action with that name; check the Marketplace yourself before publishing. Alternatives that are also free on npm: `bumpwise`, `breakwatch`, `upgrade-impact`.
 
 ## Development
 
