@@ -37,7 +37,7 @@ export function scopeFiles(root: string, files: string[], pkg: string, manifests
   for (const m of files.filter((f) => path.posix.basename(f) === 'package.json')) {
     const d = path.posix.dirname(m) === '.' ? '' : path.posix.dirname(m);
     if (dirs.includes(d) || !dirs.some((s) => under(m, s))) continue;
-    let declares = false;
+    let declares: boolean;
     try {
       const json = JSON.parse(readFileSync(path.join(root, m), 'utf8')) as Record<string, Record<string, unknown> | undefined>;
       declares = DEP_FIELDS.some((field) => json[field]?.[pkg] !== undefined);
