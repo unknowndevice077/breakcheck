@@ -1,0 +1,195 @@
+import type { ChangeReport, PackageReport, RunReport, VerifiedHit } from '../types.js';
+
+export const MARKER = '<!-- breakcheck:comment -->';
+const MAX_COMMENT = 60_000; // GitHub's limit is 65,536 characters
+
+const isAffected = (h: VerifiedHit) => h.verdict === 'yes';
+const isPossible = (h: VerifiedHit) => h.verdict === 'unsure' || h.verdict === 'possibly';
+
+export interface Tally {
+  checked: number;
+  affected: number;
+  possible: number;
+  missing: PackageReport[];
+}
+
+export function tally(run: RunReport): Tally {
+  let checked = 0;
+  let affected = 0;
+  let possible = 0;
+  for (const p of run.packages) {
+    checked += p.changes.length;
+    for (const c of p.changes) {
+      if (c.hits.some(isAffected)) affected++;
+      else if (c.hits.some(isPossible)) possible++;
+    }
+  }
+  return { checked, affected, possible, missing: run.packages.filter((p) => p.notes.missingReason) };
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+export function headline(run: RunReport): string {
+  const t = tally(run);
+  if (t.affected) {
+    const more = t.possible ? ` (${t.possible} more may)` : '';
+    return `⚠️ ${plural(t.affected, 'breaking change')} ${t.affected === 1 ? 'affects' : 'affect'} this repo${more}`;
+  }
+  if (t.possible) return `⚠️ ${plural(t.possible, 'breaking change')} may affect this repo`;
+  if (t.missing.length) return `❓ Couldn't find release notes for ${t.missing.map((p) => p.bump.name).join(', ')}`;
+  return `✅ No breaking changes found that affect your code (${t.checked} checked)`;
+}
+
+function code(s: string): string {
+  return '`' + s.replace(/`/g, 'ˋ') + '`';
+}
+
+function esc(s: string): string {
+  return s.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+}
+
+function blobUrl(run: RunReport, file: string, line: number): string {
+  return `https://github.com/${run.repo.owner}/${run.repo.repo}/blob/${run.headSha}/${file.split('/').map(encodeURIComponent).join('/')}#L${line}`;
+}
+
+function packageLink(name: string): string {
+  return `[${code(name)}](https://www.npmjs.com/package/${name})`;
+}
+
+function affectCell(p: PackageReport): string {
+  if (p.notes.missingReason && !p.changes.length) return '❓ no release notes';
+  const a = p.changes.filter((c) => c.hits.some(isAffected)).length;
+  const m = p.changes.filter((c) => !c.hits.some(isAffected) && c.hits.some(isPossible)).length;
+  if (!a && !m) return '0';
+  if (!a) return `${m} possibly`;
+  return m ? `**${a}** (+${m} possibly)` : `**${a}**`;
+}
+
+function modeLine(run: RunReport): string {
+  const ai = run.packages.filter((p) => p.mode === 'ai');
+  const rules = run.packages.filter((p) => p.mode === 'rules' && p.notes.text);
+  const reasons = [...new Set(rules.map((p) => p.fallbackReason).filter(Boolean))];
+  const why = reasons.length ? `: ${reasons.join('; ')}` : '';
+  if (ai.length && !rules.length) return `**Mode:** AI-assisted via ${code(ai[0]?.modelLabel ?? run.providerLabel ?? 'unknown')}`;
+  if (!ai.length) return `**Mode:** Rule-based (no AI available), lower confidence${why}`;
+  return `**Mode:** AI-assisted via ${code(ai[0]?.modelLabel ?? '')} for ${ai.map((p) => code(p.bump.name)).join(', ')}; rule-based (lower confidence) for ${rules.map((p) => code(p.bump.name)).join(', ')}${why}`;
+}
+
+function hitLine(run: RunReport, h: VerifiedHit): string {
+  const icon = h.verdict === 'yes' ? '🔴' : '🟡';
+  const label = h.verdict === 'yes' ? '' : h.verdict === 'unsure' ? ' _(unsure)_' : ' _(possibly)_';
+  return `- ${icon} [${h.file}:${h.line}](${blobUrl(run, h.file, h.line)})${label}: ${esc(h.reason)}`;
+}
+
+function diffBlock(h: VerifiedHit): string {
+  if (!h.fix) return '';
+  const minus = h.fix.before.split('\n').map((l) => `-${l}`);
+  const plus = h.fix.after.split('\n').map((l) => `+${l}`);
+  return ['', `  Suggested fix for \`${h.file}:${h.line}\`:`, '', '  ```diff', ...[...minus, ...plus].map((l) => `  ${l}`), '  ```'].join('\n');
+}
+
+function changeSection(run: RunReport, p: PackageReport, c: ChangeReport): string {
+  const relevant = c.hits.filter((h) => h.verdict !== 'no');
+  const definite = relevant.some(isAffected);
+  const where = plural(relevant.length, 'location');
+  const lines = [
+    '<details>',
+    `<summary>${definite ? '⚠️' : '🟡'} <b>${p.bump.name}</b>: ${esc(c.change.summary)} (${where})</summary>`,
+    '',
+  ];
+  for (const h of relevant) {
+    lines.push(hitLine(run, h));
+    const d = diffBlock(h);
+    if (d) lines.push(d);
+  }
+  const ruledOut = c.hits.filter((h) => h.verdict === 'no').length;
+  if (ruledOut) lines.push(`- ${plural(ruledOut, 'other match', 'other matches')} checked and ruled out by the model`);
+  if (c.change.migration.length) {
+    lines.push('', '**How to migrate**', '', ...c.change.migration.map((m, i) => `${i + 1}. ${m}`));
+  }
+  if (c.change.sourceUrl) lines.push('', `Source: ${c.change.sourceUrl}`);
+  lines.push('', '</details>');
+  return lines.join('\n');
+}
+
+function checkedList(p: PackageReport): string {
+  const rows = p.changes.map((c) => {
+    const status = c.hits.some(isAffected)
+      ? 'affects this repo'
+      : c.hits.some(isPossible)
+        ? 'possibly affects this repo'
+        : c.hits.length
+          ? 'matches ruled out'
+          : c.change.affectedSymbols.length || c.change.searchPatterns.length || c.change.fileGlobs.length
+            ? 'no usages found'
+            : 'nothing to search for automatically; review manually';
+    const link = c.change.sourceUrl ? ` ([source](${c.change.sourceUrl}))` : '';
+    return `- ${esc(c.change.summary)}: _${status}_${link}`;
+  });
+  return rows.join('\n');
+}
+
+export function renderComment(run: RunReport): string {
+  const t = tally(run);
+  const out: string[] = [MARKER, `## ${headline(run)}`, ''];
+  out.push('_breakcheck reads the release notes for each dependency bump in this PR and searches this repo for code the breaking changes touch._', '');
+
+  out.push('| Package | Version range | Breaking changes found | Affect you |', '| --- | --- | --- | --- |');
+  for (const p of run.packages) {
+    const found = p.notes.missingReason && !p.changes.length ? '–' : String(p.changes.length);
+    out.push(`| ${packageLink(p.bump.name)} | ${p.bump.fromVersion} → ${p.bump.toVersion} (${p.bump.bumpType}) | ${found} | ${affectCell(p)} |`);
+  }
+  out.push('');
+
+  const sections: string[] = [];
+  const ordered = run.packages.flatMap((p) =>
+    p.changes
+      .filter((c) => c.hits.some((h) => isAffected(h) || isPossible(h)))
+      .sort((a, b) => Number(b.hits.some(isAffected)) - Number(a.hits.some(isAffected)))
+      .map((c) => ({ p, c })),
+  );
+  for (const { p, c } of ordered) sections.push(changeSection(run, p, c));
+  if (sections.length) out.push('### What to look at', '', ...sections.flatMap((s) => [s, '']));
+
+  if (t.missing.length) {
+    out.push('### Release notes not found', '');
+    for (const p of t.missing) out.push(`- ${code(p.bump.name)} ${p.bump.fromVersion} → ${p.bump.toVersion}: ${p.notes.missingReason}. Review the upgrade manually.`);
+    out.push('');
+  }
+
+  const detail: string[] = [];
+  for (const p of run.packages) {
+    if (!p.changes.length) continue;
+    detail.push(`**${p.bump.name}** (${p.mode === 'ai' ? 'AI-extracted' : 'rule-based, low confidence'}${p.fromCache ? ', cached' : ''}${p.notes.truncated ? ', notes truncated' : ''})`, '', checkedList(p), '');
+  }
+  if (detail.length) out.push('<details>', `<summary>All ${plural(t.checked, 'breaking change')} checked</summary>`, '', ...detail, '</details>', '');
+
+  const notes = run.packages.flatMap((p) => p.unanalysed.map((u) => `- ${code(p.bump.name)}: ${esc(u)}`));
+  if (notes.length) out.push('<details>', `<summary>Couldn't analyse (${notes.length})</summary>`, '', ...notes, '', '</details>', '');
+
+  out.push(modeLine(run), '');
+  out.push(footer(run));
+  let body = out.join('\n');
+  if (body.length > MAX_COMMENT) {
+    body = body.slice(0, MAX_COMMENT) + `\n\n…comment truncated to fit GitHub's size limit. See the job summary for the full list.\n\n${footer(run)}`;
+  }
+  return body;
+}
+
+function footer(run: RunReport): string {
+  const pkgs = run.packages.map((p) => `${p.bump.name}`).join(', ');
+  const sources = new Set(run.packages.flatMap((p) => p.notes.sources.map((s) => s.kind)));
+  const from = [sources.has('release') && 'GitHub Releases', sources.has('changelog') && 'CHANGELOG files', sources.has('migration-guide') && 'migration guides'].filter(Boolean).join(', ') || 'no release notes';
+  const skipped = run.skipped.length ? ` Skipped: ${run.skipped.map((s) => `${s.name} (${s.reason})`).join('; ')}.` : '';
+  return [
+    '---',
+    `<sub>**Checked:** direct dependency bumps (${pkgs || 'none'}) against ${from}, in source files that import each package, config files and package.json scripts.${skipped} ` +
+      `**Not checked:** transitive dependencies, runtime behaviour without a code-level signal, and usages that can't be followed statically. ` +
+      `This is advisory and does not mean the upgrade is safe. Generated by [breakcheck](https://github.com/unknowndevice077/breakcheck).</sub>`,
+  ].join('\n');
+}
+
+/** Body used when a previously commented PR no longer contains any dependency bumps. */
+export function renderNoBumps(): string {
+  return [MARKER, '## breakcheck: no dependency bumps in this PR any more', '', '<sub>Nothing to analyse. This comment is kept so earlier results are not mistaken for current ones.</sub>'].join('\n');
+}
