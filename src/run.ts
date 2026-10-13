@@ -176,7 +176,7 @@ async function analysePackage(bump: Bump, deps: RunDeps, opts: RunOptions, extra
   let hits = new Map<string, UsageHit[]>();
   let importingFiles: string[] = [];
   try {
-    const found = findUsages(deps.workspace, bump.name, [...changes, ...extras]);
+    const found = findUsages(deps.workspace, bump.name, [...changes, ...extras], { manifests: bump.manifests });
     hits = found.hits;
     if (extras.length) {
       const seen = new Set(changes.flatMap((c) => (hits.get(c.id) ?? []).map((h) => `${h.file}:${h.line}`)));

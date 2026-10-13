@@ -18,6 +18,35 @@ const CONVENTIONAL_RECEIVERS = new Set(['req', 'res', 'app', 'router', 'request'
 export interface FinderOptions {
   contextLines?: number;
   maxHitsPerChange?: number;
+  /** Repo-relative package.json files that declare the package; the search stays inside their projects */
+  manifests?: string[];
+}
+
+const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+
+/**
+ * The files that belong to the projects using `pkg`: under the directories of the manifests that
+ * declare it, minus nested projects (fixtures, examples, other workspaces) whose own package.json
+ * does not declare it. Without manifests, every file.
+ */
+export function scopeFiles(root: string, files: string[], pkg: string, manifests: string[] | undefined): string[] {
+  if (!manifests?.length) return files;
+  const dirs = [...new Set(manifests.map((m) => path.posix.dirname(m)).map((d) => (d === '.' ? '' : d)))];
+  const under = (f: string, d: string) => d === '' || f.startsWith(`${d}/`);
+  const excluded: string[] = [];
+  for (const m of files.filter((f) => path.posix.basename(f) === 'package.json')) {
+    const d = path.posix.dirname(m) === '.' ? '' : path.posix.dirname(m);
+    if (dirs.includes(d) || !dirs.some((s) => under(m, s))) continue;
+    let declares = false;
+    try {
+      const json = JSON.parse(readFileSync(path.join(root, m), 'utf8')) as Record<string, Record<string, unknown> | undefined>;
+      declares = DEP_FIELDS.some((field) => json[field]?.[pkg] !== undefined);
+    } catch {
+      declares = true; // unreadable: keep it rather than hide usages
+    }
+    if (!declares) excluded.push(d);
+  }
+  return files.filter((f) => dirs.some((d) => under(f, d)) && !excluded.some((d) => under(f, d) && !dirs.some((s) => s.length > d.length && under(f, s))));
 }
 
 export interface FinderResult {
@@ -282,7 +311,7 @@ export function snippet(lines: string[], line: number, context: number): { text:
 export function findUsages(root: string, pkg: string, changes: BreakingChange[], opts: FinderOptions = {}): FinderResult {
   const context = opts.contextLines ?? 10;
   const maxHits = opts.maxHitsPerChange ?? 20;
-  const files = listRepoFiles(root);
+  const files = scopeFiles(root, listRepoFiles(root), pkg, opts.manifests);
   const importPaths = [...new Set(changes.flatMap((c) => c.affectedSymbols.filter((s) => s.type === 'import-path').map((s) => s.name)))].filter((p) => p !== pkg);
   const shortName = pkg.replace(/^@[^/]+\//, '');
   const unanalysed: string[] = [];
