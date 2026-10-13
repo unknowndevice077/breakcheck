@@ -1,0 +1,10 @@
+{
+  "name": "usage-fixture",
+  "private": true,
+  "scripts": {
+    "lint": "eslint --ext .ts,.tsx src",
+    "dev": "next dev --turbo"
+  },
+  "dependencies": { "react-router": "^6.28.0", "express": "^4.21.2" },
+  "devDependencies": { "eslint": "^8.57.0" }
+}
