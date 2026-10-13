@@ -291,6 +291,7 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
   const extraCounts = new Map<string, number>();
   const textCache = new Map<string, string[]>();
 
+  const isPackageName = (p: string) => [pkg, shortName].includes(p.replace(/^['"]|['"]$/g, '').trim());
   const readLines = (f: string): string[] | null => {
     if (isSecretFile(f)) return null;
     if (textCache.has(f)) return textCache.get(f) ?? null;
@@ -439,7 +440,7 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
         }
       }
       for (const p of change.searchPatterns) {
-        const re = patternToRegex(p);
+        const re = isPackageName(p) ? null : patternToRegex(p);
         if (re) (readLines(file) ?? []).forEach((l, i) => re.test(l) && add(change, file, i + 1, 'pattern', p));
       }
     }
@@ -480,6 +481,11 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
       }
     }
     for (const p of change.searchPatterns) {
+      // The package's own name matches every manifest and import: it says nothing about usage.
+      if (isPackageName(p)) {
+        diagnostics.push(`${change.id}: ignored search pattern \`${p}\` (the package name)`);
+        continue;
+      }
       const re = patternToRegex(p);
       if (!re) continue;
       for (const f of [...configFiles, ...manifests]) (readLines(f) ?? []).forEach((l, i) => re.test(l) && add(change, f, i + 1, 'pattern', p));
