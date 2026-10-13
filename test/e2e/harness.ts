@@ -72,6 +72,8 @@ export interface PrSpec {
   baseSha: string;
   headSha: string;
   files: Record<string, { base?: string; head?: string }>;
+  /** Defaults to baseSha (the base branch has not moved) */
+  mergeBase?: string;
   existingComments?: { id: number; body: string }[];
 }
 
@@ -80,6 +82,7 @@ export function prRoutes(spec: PrSpec): Route[] {
   const base = `${API}/repos/${spec.owner}/${spec.repo}`;
   const routes: Route[] = [
     { url: `${base}/pulls/${spec.pr}/files?per_page=100&page=1`, json: Object.keys(spec.files).map((filename) => ({ filename, status: 'modified' })) },
+    { url: `${base}/compare/${spec.baseSha}...${spec.headSha}?per_page=1`, json: { merge_base_commit: { sha: spec.mergeBase ?? spec.baseSha } } },
     { url: `${base}/issues/${spec.pr}/comments?per_page=100&page=1`, json: (spec.existingComments ?? []).map((c) => ({ ...c, user: { login: 'github-actions[bot]' } })) },
     { method: 'POST', url: `${base}/issues/${spec.pr}/comments`, status: 201, json: { id: 1001, html_url: `https://github.com/${spec.owner}/${spec.repo}/pull/${spec.pr}#issuecomment-1001` } },
   ];
@@ -87,7 +90,7 @@ export function prRoutes(spec: PrSpec): Route[] {
     routes.push({ method: 'PATCH', url: `${base}/issues/comments/${c.id}`, json: { id: c.id, html_url: `https://github.com/${spec.owner}/${spec.repo}/pull/${spec.pr}#issuecomment-${c.id}` } });
   }
   for (const [file, v] of Object.entries(spec.files)) {
-    if (v.base !== undefined) routes.push({ url: `${base}/contents/${file}?ref=${spec.baseSha}`, text: v.base });
+    if (v.base !== undefined) routes.push({ url: `${base}/contents/${file}?ref=${spec.mergeBase ?? spec.baseSha}`, text: v.base });
     if (v.head !== undefined) routes.push({ url: `${base}/contents/${file}?ref=${spec.headSha}`, text: v.head });
   }
   return routes;

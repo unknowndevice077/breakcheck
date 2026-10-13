@@ -59,7 +59,13 @@ export async function run(ctx: RunContext, deps: RunDeps, opts: RunOptions): Pro
   const changed = (await gh.listPullFiles(ctx.owner, ctx.repo, ctx.pr)).filter((f) => isDependencyFile(f) && !f.includes('node_modules/'));
   log(`Dependency files changed: ${changed.join(', ') || 'none'}`);
 
-  const read = (file: string, side: 'base' | 'head') => gh.getFile(ctx.owner, ctx.repo, file, side === 'base' ? ctx.baseSha : ctx.headSha);
+  // pull_request.base.sha is the base branch tip, which moves on after the PR branches off. Compare
+  // against the merge base, like GitHub's own diff, so bumps made on the base branch since then
+  // don't show up as changes (or downgrades) in this PR.
+  const mergeBase = changed.length ? await gh.mergeBase(ctx.owner, ctx.repo, ctx.baseSha, ctx.headSha).catch(() => null) : null;
+  const baseRef = mergeBase ?? ctx.baseSha;
+  if (mergeBase && mergeBase !== ctx.baseSha) log(`Comparing against the merge base ${mergeBase.slice(0, 7)} (the base branch has moved since this PR branched).`);
+  const read = (file: string, side: 'base' | 'head') => gh.getFile(ctx.owner, ctx.repo, file, side === 'base' ? baseRef : ctx.headSha);
   const { bumps, skipped } = changed.length ? await detectBumps(changed, read, { includePatch: opts.includePatch }) : { bumps: [], skipped: [] };
 
   if (!bumps.length) {

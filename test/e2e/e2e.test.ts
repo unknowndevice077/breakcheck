@@ -426,6 +426,22 @@ describe('caching and comment lifecycle', () => {
     expect(r.result.comment).toMatchObject({ id: 555, action: 'updated' });
   });
 
+  it('diffs against the merge base, not the moved base branch tip', async () => {
+    // The base branch bumped react to 19 after this PR branched; the PR itself only bumps express.
+    const mergeBase = 'ba5e000000000000000000000000000000000003';
+    const rec = prRoutes({
+      ...CTX,
+      mergeBase,
+      files: { 'package.json': { base: manifest({ react: '18.3.1', express: '4.21.2' }), head: manifest({ react: '18.3.1', express: '5.0.1' }) } },
+    });
+    const tip = { url: `https://api.github.com/repos/acme/shop/contents/package.json?ref=${CTX.baseSha}`, text: manifest({ react: '19.0.0', express: '4.21.2' }) };
+    const f = createRecordedFetch([...rec, tip]);
+    const res = await run(CTX, { gh: createGitHubApi('t', { fetch: f.fetch }), registry: createRegistry({ fetch: f.fetch, baseUrl: 'https://registry.npmjs.org' }), cache: createMemoryCache(), gateway: new ModelGateway(null), workspace: fixturePath('e2e/express/repo') }, { includePatch: false, maxPackages: 10 });
+    expect(res.report?.packages.map((p) => `${p.bump.name} ${p.bump.fromVersion}→${p.bump.toVersion}`)).toEqual(['express 4.21.2→5.0.1']);
+    expect(res.report?.skipped).toEqual([]);
+    expect(f.requests.some((q) => q.url.includes(`ref=${CTX.baseSha}`))).toBe(false);
+  });
+
   it('does nothing when the PR has no dependency bumps', async () => {
     const rec = prRoutes({ ...CTX, files: { 'README.md': { base: 'a', head: 'b' } } });
     const f = createRecordedFetch(rec);
