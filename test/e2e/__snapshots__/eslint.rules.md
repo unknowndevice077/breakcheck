@@ -10,7 +10,7 @@ _breakcheck reads the release notes for each dependency bump in this PR and sear
 ### What to look at
 
 <details>
-<summary>🟡 <b>eslint</b>: New default config format (`eslint.config.js`) (1 location)</summary>
+<summary>🟡 <b>eslint</b>: New default config format (<code>eslint.config.js</code>) (1 location)</summary>
 
 - 🟡 [.eslintrc.json:1](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/.eslintrc.json#L1) _(possibly)_: File matches `.eslintrc.*`
 
@@ -23,7 +23,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 </details>
 
 <details>
-<summary>🟡 <b>eslint</b>: Removed `require-jsdoc` and `valid-jsdoc` rules (1 location)</summary>
+<summary>🟡 <b>eslint</b>: Removed <code>require-jsdoc</code> and <code>valid-jsdoc</code> rules (1 location)</summary>
 
 - 🟡 [.eslintrc.json:6](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/.eslintrc.json#L6) _(possibly)_: Uses `valid-jsdoc`
 
@@ -36,7 +36,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 </details>
 
 <details>
-<summary>🟡 <b>eslint</b>: `varsIgnorePattern` option of `no-unused-vars` no longer applies to catch arguments (1 location)</summary>
+<summary>🟡 <b>eslint</b>: <code>varsIgnorePattern</code> option of <code>no-unused-vars</code> no longer applies to catch arguments (1 location)</summary>
 
 - 🟡 [.eslintrc.json:7](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/.eslintrc.json#L7) _(possibly)_: Uses `no-unused-vars`
 
@@ -49,7 +49,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 </details>
 
 <details>
-<summary>🟡 <b>eslint</b>: `"eslint:recommended"` and `"eslint:all"` no longer accepted in flat config (1 location)</summary>
+<summary>🟡 <b>eslint</b>: <code>"eslint:recommended"</code> and <code>"eslint:all"</code> no longer accepted in flat config (1 location)</summary>
 
 - 🟡 [.eslintrc.json:3](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/.eslintrc.json#L3) _(possibly)_: Uses `eslint:recommended`
 
@@ -62,7 +62,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 </details>
 
 <details>
-<summary>🟡 <b>eslint</b>: `no-unused-vars` now defaults `caughtErrors` to `"all"` (1 location)</summary>
+<summary>🟡 <b>eslint</b>: <code>no-unused-vars</code> now defaults <code>caughtErrors</code> to <code>"all"</code> (1 location)</summary>
 
 - 🟡 [.eslintrc.json:7](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/.eslintrc.json#L7) _(possibly)_: Uses `no-unused-vars`
 

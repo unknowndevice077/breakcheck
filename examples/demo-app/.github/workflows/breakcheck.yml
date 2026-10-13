@@ -1,0 +1,25 @@
+# .github/workflows/breakcheck.yml
+name: breakcheck
+
+on:
+  pull_request:
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/npm-shrinkwrap.json'
+      - '**/pnpm-lock.yaml'
+      - '**/yarn.lock'
+
+permissions:
+  contents: read
+  pull-requests: write
+  # Lets breakcheck use GitHub Copilot with the workflow token (no API key).
+  # Remove this line to stay rule-based only.
+  copilot-requests: write
+
+jobs:
+  breakcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: unknowndevice077/breakcheck@v0

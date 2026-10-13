@@ -48,6 +48,16 @@ function esc(s: string): string {
   return s.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }
 
+/** Markdown is not rendered inside <summary>, so turn `code` spans into <code> and escape the rest. */
+export function inlineHtml(s: string): string {
+  const escape = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s
+    .replace(/\r?\n/g, ' ')
+    .split(/(`[^`]+`)/)
+    .map((part) => (/^`[^`]+`$/.test(part) ? `<code>${escape(part.slice(1, -1))}</code>` : escape(part)))
+    .join('');
+}
+
 function blobUrl(run: RunReport, file: string, line: number): string {
   return `https://github.com/${run.repo.owner}/${run.repo.repo}/blob/${run.headSha}/${file.split('/').map(encodeURIComponent).join('/')}#L${line}`;
 }
@@ -94,7 +104,7 @@ function changeSection(run: RunReport, p: PackageReport, c: ChangeReport): strin
   const where = plural(relevant.length, 'location');
   const lines = [
     '<details>',
-    `<summary>${definite ? '⚠️' : '🟡'} <b>${p.bump.name}</b>: ${esc(c.change.summary)} (${where})</summary>`,
+    `<summary>${definite ? '⚠️' : '🟡'} <b>${p.bump.name}</b>: ${inlineHtml(c.change.summary)} (${where})</summary>`,
     '',
   ];
   for (const h of relevant) {

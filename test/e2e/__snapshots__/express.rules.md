@@ -10,7 +10,7 @@ _breakcheck reads the release notes for each dependency bump in this PR and sear
 ### What to look at
 
 <details>
-<summary>🟡 <b>express</b>: Removed: `app.del` - use `app.delete` (1 location)</summary>
+<summary>🟡 <b>express</b>: Removed: <code>app.del</code> - use <code>app.delete</code> (1 location)</summary>
 
 - 🟡 [src/server.js:20](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L20) _(possibly)_: Uses `app.del`
 
@@ -19,7 +19,7 @@ Source: https://github.com/expressjs/express/blob/v5.0.1/History.md
 </details>
 
 <details>
-<summary>🟡 <b>express</b>: Removed: `res.json(obj, status)` signature - use `res.json(status, obj)` (3 locations)</summary>
+<summary>🟡 <b>express</b>: Removed: <code>res.json(obj, status)</code> signature - use <code>res.json(status, obj)</code> (3 locations)</summary>
 
 - 🟡 [src/server.js:7](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L7) _(possibly)_: Uses `res.json`
 - 🟡 [src/server.js:12](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L12) _(possibly)_: Uses `res.json`
@@ -30,7 +30,7 @@ Source: https://github.com/expressjs/express/blob/v5.0.1/History.md
 </details>
 
 <details>
-<summary>🟡 <b>express</b>: Removed: `res.sendfile` - use `res.sendFile` instead (1 location)</summary>
+<summary>🟡 <b>express</b>: Removed: <code>res.sendfile</code> - use <code>res.sendFile</code> instead (1 location)</summary>
 
 - 🟡 [src/server.js:25](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L25) _(possibly)_: Uses `res.sendfile`
 
@@ -39,7 +39,7 @@ Source: https://github.com/expressjs/express/blob/v5.0.1/History.md
 </details>
 
 <details>
-<summary>🟡 <b>express</b>: Removed: `req.param()` -- use `req.params`, `req.body`, or `req.query` instead (1 location)</summary>
+<summary>🟡 <b>express</b>: Removed: <code>req.param()</code> -- use <code>req.params</code>, <code>req.body</code>, or <code>req.query</code> instead (1 location)</summary>
 
 - 🟡 [src/server.js:16](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L16) _(possibly)_: Uses `req.param`
 
@@ -48,7 +48,7 @@ Source: https://github.com/expressjs/express/blob/v5.0.1/History.md
 </details>
 
 <details>
-<summary>🟡 <b>express</b>: Removed: `res.json(status, obj)` signature - use `res.status(status).json(obj)` (3 locations)</summary>
+<summary>🟡 <b>express</b>: Removed: <code>res.json(status, obj)</code> signature - use <code>res.status(status).json(obj)</code> (3 locations)</summary>
 
 - 🟡 [src/server.js:7](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L7) _(possibly)_: Uses `res.json`
 - 🟡 [src/server.js:12](https://github.com/acme/shop/blob/c0ffee0000000000000000000000000000000002/src/server.js#L12) _(possibly)_: Uses `res.json`
