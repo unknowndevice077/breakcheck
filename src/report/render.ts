@@ -202,7 +202,7 @@ function renderWith(run: RunReport, limits: Limits, maxLength: number): string {
   head.push('| Package | Version range | Breaking changes found | Affect you |', '| --- | --- | --- | --- |');
   for (const p of run.packages) {
     const found = p.notes.missingReason && !p.changes.length ? '–' : String(p.changes.length);
-    head.push(`| ${packageLink(p.bump.name)} | ${p.bump.fromVersion} → ${p.bump.toVersion} (${p.bump.bumpType}) | ${found} | ${affectCell(p)} |`);
+    head.push(`| ${packageLink(p.bump.packageName ?? p.bump.name)}${p.bump.packageName ? ` (as ${code(p.bump.name)})` : ''} | ${p.bump.fromVersion} → ${p.bump.toVersion} (${p.bump.bumpType}) | ${found} | ${affectCell(p)} |`);
   }
   head.push('');
 
