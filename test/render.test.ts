@@ -71,3 +71,23 @@ describe('headline when the notes list nothing', () => {
     expect(renderComment(r)).toMatch(/^## ✅ The release notes list no breaking changes \(1 package checked\)$/m);
   });
 });
+
+describe('suggested fixes', () => {
+  it('shows a fix once when neighbouring hits in the same file repeat it', () => {
+    const r = bigReport(1, 1, 3);
+    const hits = r.packages[0]!.changes[0]!.hits;
+    const fix = { before: "export const useCart = defineStore({\n  id: 'cart',", after: "export const useCart = defineStore('cart', {" };
+    hits.forEach((h, i) => Object.assign(h, { file: 'src/stores/cart.ts', line: [1, 4, 5][i] }));
+    hits[0]!.fix = fix;
+    hits[1]!.fix = { ...fix };
+    hits[2]!.fix = { before: "id: 'cart',", after: '' };
+    const body = renderComment(r);
+    expect(body.match(/Suggested fix/g)).toHaveLength(1);
+    expect(body).toContain('src/stores/cart.ts:5');
+  });
+
+  it('still shows the same change in different files', () => {
+    const body = renderComment(bigReport(1, 1, 3));
+    expect(body.match(/Suggested fix/g)).toHaveLength(3);
+  });
+});

@@ -211,3 +211,17 @@ describe('findUsages: single-file components', () => {
     expect(where(res.hits.get('cancel'))).toEqual(['src/List.svelte:7']);
   });
 });
+
+describe('findUsages: component templates and Vue global properties', () => {
+  const components = new URL('./fixtures/projects/components/', import.meta.url).pathname;
+  const res = findUsages(components, 'vue-i18n', [change('tc', { affectedSymbols: [{ name: 'tc', type: 'member' }, { name: '$tc', type: 'member' }] })]);
+
+  it('finds members called bare in templates and $-globals in components that do not import the package', () => {
+    expect(where(res.hits.get('tc'))).toEqual(['src/Apples.vue:2', 'src/Apples.vue:11', 'src/Uses.vue:2']);
+  });
+
+  it('leaves $-globals alone when nothing in the repo uses the package', () => {
+    const none = findUsages(components, 'vue-i18n-not-installed', [change('tc', { affectedSymbols: [{ name: '$tc', type: 'member' }] })]);
+    expect(none.hits.get('tc')).toEqual([]);
+  });
+});

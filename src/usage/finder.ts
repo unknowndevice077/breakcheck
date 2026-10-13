@@ -326,7 +326,7 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
     skipLoadingLibFiles: true,
     compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve, noLib: true },
   });
-  const importing: { file: string; sf: SourceFile; b: Bindings }[] = [];
+  const importing: { file: string; sf: SourceFile; b: Bindings; template: number[] }[] = [];
   const needles = [pkg, ...importPaths];
   for (const f of files) {
     const component = COMPONENT_EXT.test(f);
@@ -345,12 +345,14 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
     }
     const b = collectBindings(sf, pkg, importPaths);
     if (!b.importLines.length && !b.dynamic.length) continue;
-    importing.push({ file: f, sf, b });
+    // Lines outside the component's script blocks: the template, where members are called bare (`$tc(...)`)
+    const template = script ? script.text.split('\n').flatMap((l, i) => (!l.trim() && lines[i]?.trim() ? [i + 1] : [])) : [];
+    importing.push({ file: f, sf, b, template });
     for (const line of b.dynamic) unanalysed.push(`${f}:${line}: dynamic \`import()\` whose usage can't be followed statically`);
     for (const line of b.exportStar) unanalysed.push(`${f}:${line}: \`export * from '${pkg}'\` re-exports everything, so removed exports surface to this file's importers`);
   }
 
-  for (const { file, sf, b } of importing) {
+  for (const { file, sf, b, template } of importing) {
     // Identifier references grouped by name, skipping property names and import specifiers
     const refs = new Map<string, number[]>();
     for (const id of sf.getDescendantsOfKind(SyntaxKind.Identifier)) {
@@ -423,6 +425,11 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
             }
             add(change, file, pa.getStartLineNumber(), 'symbol', `${recv}.${prop}`);
           }
+          if (!recvIsPackage && template.length) {
+            const call = new RegExp(`(^|[^\\w$])${escapeRe(prop)}\\s*\\(`);
+            const raw = readLines(file) ?? [];
+            for (const line of template) if (call.test(raw[line - 1] ?? '')) add(change, file, line, 'pattern', prop);
+          }
           continue;
         }
         if (sym.type === 'option' || sym.type === 'config-key') {
@@ -433,6 +440,21 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
       for (const p of change.searchPatterns) {
         const re = patternToRegex(p);
         if (re) (readLines(file) ?? []).forEach((l, i) => re.test(l) && add(change, file, i + 1, 'pattern', p));
+      }
+    }
+  }
+
+  // 1b. `$`-prefixed members (`$tc`, `$route`) are Vue global properties: a plugin installed once makes
+  // them available in every component, including ones that never import the package.
+  if (importing.length) {
+    const importingSet = new Set(importing.map((i) => i.file));
+    const others = files.filter((f) => (SOURCE_EXT.test(f) || COMPONENT_EXT.test(f)) && !f.endsWith('.d.ts') && !importingSet.has(f));
+    for (const change of changes) {
+      for (const sym of change.affectedSymbols) {
+        const prop = sym.type === 'member' ? sym.name.split('.').at(-1) : undefined;
+        if (!prop?.startsWith('$') || prop.length < 2) continue;
+        const re = new RegExp(`(^|[^\\w$])${escapeRe(prop)}(?![\\w$])`);
+        for (const f of others) (readLines(f) ?? []).forEach((l, i) => re.test(l) && add(change, f, i + 1, 'pattern', prop));
       }
     }
   }
