@@ -1,9 +1,12 @@
 {
   "name": "acme-monorepo",
   "private": true,
-  "scripts": { "lint": "eslint .", "test": "vitest run" },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
   "devDependencies": {
-    "typescript": "~5.4.5",
-    "vitest": "^1.6.0"
+    "typescript": "~5.6.3",
+    "vitest": "^3.0.0"
   }
 }
