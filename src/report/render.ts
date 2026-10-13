@@ -8,6 +8,8 @@ const isPossible = (h: VerifiedHit) => h.verdict === 'unsure' || h.verdict === '
 
 export interface Tally {
   checked: number;
+  /** Changes with nothing to search for (runtime requirements, behaviour changes): need a human */
+  manual: number;
   affected: number;
   possible: number;
   missing: PackageReport[];
@@ -15,16 +17,18 @@ export interface Tally {
 
 export function tally(run: RunReport): Tally {
   let checked = 0;
+  let manual = 0;
   let affected = 0;
   let possible = 0;
   for (const p of run.packages) {
     checked += p.changes.length;
+    manual += p.changes.filter((c) => !c.change.affectedSymbols.length && !c.change.searchPatterns.length && !c.change.fileGlobs.length).length;
     for (const c of p.changes) {
       if (c.hits.some(isAffected)) affected++;
       else if (c.hits.some(isPossible)) possible++;
     }
   }
-  return { checked, affected, possible, missing: run.packages.filter((p) => p.notes.missingReason) };
+  return { checked, manual, affected, possible, missing: run.packages.filter((p) => p.notes.missingReason) };
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -37,7 +41,9 @@ export function headline(run: RunReport): string {
   }
   if (t.possible) return `⚠️ ${plural(t.possible, 'breaking change')} may affect this repo`;
   if (t.missing.length) return `❓ Couldn't find release notes for ${t.missing.map((p) => p.bump.name).join(', ')}`;
-  return `✅ No breaking changes found that affect your code (${t.checked} checked)`;
+  // Never let the green tick suggest more certainty than there is.
+  const unsure = t.manual ? `, ${t.manual} can't be checked automatically` : '';
+  return `✅ No breaking changes found that affect your code (${t.checked} checked${unsure})`;
 }
 
 function code(s: string): string {
