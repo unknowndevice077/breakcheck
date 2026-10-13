@@ -109,7 +109,9 @@ export async function detectBumps(changedFiles: string[], read: ReadFile, opts: 
 
   for (const dir of [...projectDirs].sort()) {
     const manifestPath = dir ? `${dir}/package.json` : 'package.json';
-    const [baseM, headM] = (await Promise.all([read(manifestPath, 'base'), read(manifestPath, 'head')])).map(parseManifest);
+    const [baseText, headText] = await Promise.all([read(manifestPath, 'base'), read(manifestPath, 'head')]);
+    const baseM = parseManifest(baseText);
+    const headM = parseManifest(headText);
     if (!headM) continue;
     const lf = nearestLockfile(dir, lockfileDirs);
 
