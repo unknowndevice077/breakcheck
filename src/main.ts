@@ -37,11 +37,13 @@ export async function main(): Promise<void> {
   let maxPackages: number;
   let includePatch: boolean;
   let failOnAffected: boolean;
+  let typecheck: boolean;
   try {
     provider = readProvider();
     maxPackages = readPositiveInt('max-packages', 10);
     includePatch = readBool('include-patch', false);
     failOnAffected = readBool('fail-on-affected', false);
+    typecheck = readBool('typecheck', true);
   } catch (e) {
     core.setFailed((e as Error).message);
     return;
@@ -61,6 +63,7 @@ export async function main(): Promise<void> {
   }
 
   const gh = createGitHubApi(token);
+  const registry = createRegistry();
   const { provider: p, reason } = createProvider({ provider, apiKey, model: core.getInput('model'), githubToken: token, copilotCliVersion: core.getInput('copilot-cli-version') });
   const gateway = new ModelGateway(p);
   core.info(p ? `AI provider: ${gateway.label}` : `Rule-based mode: ${reason}`);
@@ -70,7 +73,8 @@ export async function main(): Promise<void> {
       { owner: context.repo.owner, repo: context.repo.repo, pr: pr.number as number, baseSha: pr.base.sha as string, headSha: pr.head.sha as string },
       {
         gh,
-        registry: createRegistry(),
+        registry,
+        ...(typecheck && registry.tarball ? { tarball: registry.tarball.bind(registry) } : {}),
         cache: createActionsCache(),
         gateway,
         workspace: process.env.GITHUB_WORKSPACE || process.cwd(),
