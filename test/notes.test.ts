@@ -96,3 +96,15 @@ describe('gatherNotes: projects with more releases than we page through', () => 
     expect(notes.text).toContain('`cacheTime` was renamed to `gcTime`');
   });
 });
+
+import { checkSourceUrl } from '../src/run.js';
+describe('checkSourceUrl', () => {
+  const notes = { repo: null, text: 'x', truncated: false, migrationLinks: [], sources: [{ kind: 'release' as const, url: 'https://github.com/facebook/react/releases/tag/v19.0.0', title: 'v19.0.0' }] };
+  it('keeps links into fetched documents, including anchors', () => {
+    expect(checkSourceUrl('https://github.com/facebook/react/releases/tag/v19.0.0#breaking', notes)).toBe('https://github.com/facebook/react/releases/tag/v19.0.0#breaking');
+  });
+  it('replaces invented links with a real source', () => {
+    expect(checkSourceUrl('https://github.com/react/react/releases/tag/v19.0.0', notes)).toBe('https://github.com/facebook/react/releases/tag/v19.0.0');
+    expect(checkSourceUrl(null, notes)).toBe('https://github.com/facebook/react/releases/tag/v19.0.0');
+  });
+});
