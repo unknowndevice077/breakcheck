@@ -3,7 +3,10 @@
 export type BumpType = 'major' | 'minor' | 'patch';
 
 export interface Bump {
+  /** Name as the project depends on it (and imports it) */
   name: string;
+  /** The real npm package when the dependency is an alias ("http": "npm:axios@^1") */
+  packageName?: string;
   fromVersion: string;
   toVersion: string;
   bumpType: BumpType;
