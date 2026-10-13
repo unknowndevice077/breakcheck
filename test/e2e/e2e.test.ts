@@ -254,6 +254,20 @@ describe('specific outcomes', () => {
     expect(modelBodies.join('')).not.toContain('export default function Account() {\\n  const { user }');
   });
 
+  it('react-router (AI): rule-based safety net catches a change the model left out', async () => {
+    // Seen on a real run: the model listed `defer` but skipped `json`, though both were in the notes.
+    const model = loadModel('react-router');
+    const jd = model.extraction.breakingChanges.find((c) => c.id === 'json-defer-removed')!;
+    jd.affectedSymbols = jd.affectedSymbols.filter((s) => s.name !== 'json');
+    const r = await execute(reactRouter(), { provider: 'anthropic', model });
+    const extra = r.result.report!.packages[0]!.changes.filter((c) => c.change.id.startsWith('rules-') && c.hits.some((h) => h.file === 'app/routes/account.tsx' && h.line === 7));
+    expect(extra).toHaveLength(1);
+    expect(extra[0]!.change.affectedSymbols.map((s) => s.name)).toContain('json');
+    expect(extra[0]!.change.confidence).toBe('low');
+    // Locations the model's own changes already cover are not repeated
+    expect(extra[0]!.hits.map((h) => h.line)).not.toContain(1);
+  });
+
   it('express (AI): the model separates res.json(obj) from res.json(obj, status)', async () => {
     const r = await execute(express(), { provider: 'anthropic', model: loadModel('express') });
     const sig = r.result.report!.packages[0]!.changes.find((c) => c.change.id === 'res-json-status-signature')!;

@@ -17,7 +17,7 @@ export function extractionPrompt(bump: Bump, notes: ReleaseNotes, retryErrors?: 
     'For each breaking change:',
     '- affectedSymbols: names exactly as consumer code writes them. Use type "export" for things imported from the package (e.g. "json"), "member" for methods/properties reached through an object (e.g. "app.del", "res.sendfile"), "option" for option/flag names (e.g. "v7_startTransition"), "cli-flag" for command-line flags (e.g. "--ext"), "config-key" for config keys or rule names, "import-path" for subpath imports (e.g. "react-router-dom", "next/legacy/image").',
     '- searchPatterns: extra literal strings (or /regex/) that find usages in source or config files; leave empty when affectedSymbols already cover it.',
-    '- fileGlobs: only when a file\'s existence means the change applies (e.g. ".eslintrc*" when the legacy config format is no longer read).',
+    '- fileGlobs: only when a file\'s existence means the change applies (e.g. ".eslintrc*" when the legacy config format is no longer read). Never package.json, lockfiles or other files every project has; leave runtime/Node/peer-version requirements without patterns.',
     '- migration: short, concrete steps. sourceUrl: the URL from the === header === of the section the change came from.',
     '- confidence: "high" when the notes state it explicitly, "medium" when implied, "low" when guessed.',
     'Return {"breakingChanges": []} if there are none.',

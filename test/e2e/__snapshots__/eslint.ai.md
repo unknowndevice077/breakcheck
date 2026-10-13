@@ -5,7 +5,7 @@ _breakcheck reads the release notes for each dependency bump in this PR and sear
 
 | Package | Version range | Breaking changes found | Affect you |
 | --- | --- | --- | --- |
-| [`eslint`](https://www.npmjs.com/package/eslint) | 8.57.0 → 9.0.0 (major) | 6 | **4** (+1 possibly) |
+| [`eslint`](https://www.npmjs.com/package/eslint) | 8.57.0 → 9.0.0 (major) | 7 | **4** (+1 possibly) |
 
 ### What to look at
 
@@ -89,7 +89,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 </details>
 
 <details>
-<summary>All 6 breaking changes checked</summary>
+<summary>All 7 breaking changes checked</summary>
 
 **eslint** (AI-extracted, notes truncated)
 
@@ -99,6 +99,7 @@ Source: https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0
 - The `require-jsdoc` and `valid-jsdoc` rules were removed. — _affects this repo_ ([source](https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md))
 - `no-unused-vars` now defaults `caughtErrors` to "all". — _possibly affects this repo_ ([source](https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md))
 - Node.js below v18.18 and v19 are no longer supported. — _nothing to search for automatically; review manually_ ([source](https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md))
+- `"eslint:recommended"` and `"eslint:all"` no longer accepted in flat config — _matches ruled out_ ([source](https://github.com/eslint/eslint/blob/v9.0.0/docs/src/use/migrate-to-9.0.0.md))
 
 </details>
 

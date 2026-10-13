@@ -112,6 +112,14 @@ describe('findUsages: eslint config, CLI flags and file globs', () => {
   });
 });
 
+describe('findUsages: file globs every project matches', () => {
+  it('ignores package.json/lockfile globs instead of flagging every repo', () => {
+    const res = findUsages(root, 'react-router', [change('node-20', { kind: 'runtime', fileGlobs: ['package.json', '**/package-lock.json'] })]);
+    expect(res.hits.get('node-20')).toEqual([]);
+    expect(res.unanalysed).toEqual(expect.arrayContaining([expect.stringContaining('ignored file pattern `package.json`')]));
+  });
+});
+
 describe('globToRegex', () => {
   it('supports *, ** and {a,b}', () => {
     expect(globToRegex('.eslintrc.*').test('.eslintrc.json')).toBe(true);

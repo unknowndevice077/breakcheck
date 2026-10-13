@@ -5,7 +5,7 @@ _breakcheck reads the release notes for each dependency bump in this PR and sear
 
 | Package | Version range | Breaking changes found | Affect you |
 | --- | --- | --- | --- |
-| [`next`](https://www.npmjs.com/package/next) | 14.2.15 → 15.0.0 (major) | 5 | **3** |
+| [`next`](https://www.npmjs.com/package/next) | 14.2.15 → 15.0.0 (major) | 6 | **3** |
 
 ### What to look at
 
@@ -72,7 +72,7 @@ Source: https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-y
 </details>
 
 <details>
-<summary>All 5 breaking changes checked</summary>
+<summary>All 6 breaking changes checked</summary>
 
 **next** (AI-extracted)
 
@@ -81,6 +81,7 @@ Source: https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-y
 - `NextRequest` no longer has `geo` and `ip`; these come from your hosting provider. — _affects this repo_ ([source](https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-your-application/11-upgrading/02-version-15.mdx))
 - The `@next/font` package was removed in favour of the built-in `next/font`. — _no usages found_ ([source](https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-your-application/11-upgrading/02-version-15.mdx))
 - The App Router now requires React 19. — _nothing to search for automatically; review manually_ ([source](https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-your-application/11-upgrading/02-version-15.mdx))
+- `NextRequest` Geolocation — _matches ruled out_ ([source](https://github.com/vercel/next.js/blob/v15.0.0/docs/02-app/01-building-your-application/11-upgrading/02-version-15.mdx))
 
 </details>
 
