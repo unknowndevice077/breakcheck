@@ -1,0 +1,58 @@
+name: 'breakcheck'
+description: 'Tells you which breaking changes in a dependency upgrade actually hit your code, where, and how to fix them.'
+author: 'breakcheck contributors'
+branding:
+  icon: 'alert-triangle'
+  color: 'orange'
+
+inputs:
+  provider:
+    description: >-
+      AI provider: copilot (default; uses the workflow GITHUB_TOKEN, needs `permissions: copilot-requests: write`
+      and a Copilot plan on the repository owner, Copilot Free works), anthropic, openai, or none (rule-based only).
+      "github-models" is accepted as an alias for copilot because GitHub retired GitHub Models on 2026-07-30.
+      If the provider fails for any reason, breakcheck falls back to rule-based mode.
+    required: false
+    default: 'copilot'
+  api-key:
+    description: 'API key for anthropic or openai. On Dependabot PRs it must be stored as a Dependabot secret.'
+    required: false
+    default: ''
+  model:
+    description: 'Model override. Defaults: copilot → automatic model selection, anthropic → claude-opus-5-5, openai → gpt-5.5.'
+    required: false
+    default: ''
+  github-token:
+    description: 'Token for GitHub API calls, the PR comment and Copilot.'
+    required: false
+    default: ${{ github.token }}
+  include-patch:
+    description: 'Also analyse patch bumps (x.y.Z).'
+    required: false
+    default: 'false'
+  max-packages:
+    description: 'Maximum number of bumped packages to analyse per run (majors first).'
+    required: false
+    default: '10'
+  fail-on-affected:
+    description: 'Fail the check when any breaking change affects (or possibly affects) this repo.'
+    required: false
+    default: 'false'
+  copilot-cli-version:
+    description: 'Version of @github/copilot to run for the copilot provider.'
+    required: false
+    default: '1.0.96'
+
+outputs:
+  affected-count:
+    description: 'Breaking changes that affect this repo (AI-confirmed).'
+  possibly-affected-count:
+    description: 'Breaking changes that possibly affect this repo (unsure, or rule-based matches).'
+  mode:
+    description: 'ai, rules or mixed.'
+  comment-url:
+    description: 'URL of the PR comment.'
+
+runs:
+  using: 'node24'
+  main: 'dist/index.js'
