@@ -1,0 +1,23 @@
+# breakcheck on its own repo: runs the action from this checkout on dependency PRs
+# (e.g. Dependabot's PRs for examples/demo-app).
+name: breakcheck
+
+on:
+  pull_request:
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/pnpm-lock.yaml'
+      - '**/yarn.lock'
+
+permissions:
+  contents: read
+  pull-requests: write
+  copilot-requests: write
+
+jobs:
+  breakcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./
