@@ -189,6 +189,8 @@ CI runs lint, typecheck and tests, and fails if `dist/` doesn't match a fresh bu
   - empty version headers using up the size budget;
   - file globs that matched every file.
 
+A second round on a Vue 3 app with a yarn berry lockfile (pinia 2 → 3, vue-i18n 9 → 11, [unknowndevice077/breakcheck#4](https://github.com/unknowndevice077/breakcheck/pull/4)) found `defineStore({ id })`, `allowComposition`, `i18n.global.tc` and every `$tc(...)`. That includes `$tc` in templates and in an Options API component that never imports vue-i18n. A planted `PiniaVuePlugin` import was not flagged, because pinia's v3 notes don't mention it.
+
 To try it on a real repo, see [`examples/`](examples/).
 
 ## License
