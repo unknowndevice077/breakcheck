@@ -145,9 +145,9 @@ export function pickMigrationGuides(paths: string[], directory: string | undefin
     let score = 0;
     if (MIGRATION_NAMES.test(p)) score = 5;
     else if (/migrat|upgrad/i.test(p)) {
-      const base = path.basename(p).replace(/\.mdx?$/i, '');
-      const nums = [...base.matchAll(/(?:^|[^0-9.])(?:v|version-?|to-)?(\d+)(?:\.0\.0|\.x)?(?=$|[^0-9.])/gi)].map((m) => Number(m[1]));
-      const leading = base.match(/^(\d+)-/)?.[1]; // "02-version-15" → 02 is just an ordering prefix
+      const stem = path.basename(p).replace(/\.mdx?$/i, '');
+      const nums = [...stem.matchAll(/(?:^|[^0-9.])(?:v|version-?|to-)?(\d+)(?:\.0\.0|\.x)?(?=$|[^0-9.])/gi)].map((m) => Number(m[1]));
+      const leading = stem.match(/^(\d+)-/)?.[1]; // "02-version-15" → 02 is just an ordering prefix
       const relevant = nums.filter((n, i) => !(i === 0 && leading && n === Number(leading)));
       if (relevant.some((n) => majors.includes(n))) score = 4;
       else if (relevant.includes(fromMajor) && /upgrad/i.test(p)) score = 3;
