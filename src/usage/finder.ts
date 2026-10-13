@@ -170,6 +170,11 @@ function collectBindings(sf: SourceFile, pkg: string, extraSpecifiers: string[])
   return b;
 }
 
+/** `ReactDOM` ≈ `react-dom`, `Express` ≈ `express`. */
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -332,7 +337,8 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
           const parts = sym.name.split('.');
           const prop = parts.at(-1) ?? sym.name;
           const recvName = parts.slice(0, -1).join('.');
-          const recvIsPackage = recvName === shortName || recvName === pkg || [...b.named.values()].some((i) => i.imported === recvName);
+          // `ReactDOM.render` for react-dom, `express.query` for express: the receiver is the package itself
+          const recvIsPackage = norm(recvName) === norm(shortName) || recvName === pkg || [...b.named.values()].some((i) => i.imported === recvName);
           for (const pa of propAccesses) {
             if (pa.getName() !== prop) continue;
             const recv = pa.getExpression().getText();
