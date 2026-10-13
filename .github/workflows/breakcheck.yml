@@ -1,0 +1,13 @@
+name: breakcheck
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: write
+  copilot-requests: write
+jobs:
+  breakcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: unknowndevice077/breakcheck@claude/gallant-lamport-565bjr
