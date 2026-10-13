@@ -1,6 +1,6 @@
 name: 'breakcheck'
 description: 'Tells you which breaking changes in a dependency upgrade actually hit your code, where, and how to fix them.'
-author: 'breakcheck contributors'
+author: 'unknowndevice077'
 branding:
   icon: 'alert-triangle'
   color: 'orange'
