@@ -104,6 +104,8 @@ PRs from forks get a read-only token that `permissions:` cannot raise, so breakc
   - the release notes;
   - for each matched location, a ±10-line snippet, its path and line number, and the breaking change it may be affected by.
 - Whole files and the repo are never sent. If nothing matches, no code is sent at all.
+- Secret-bearing files (`.env*`, `.npmrc`, `.yarnrc*`, key and credential files) are never read.
+- Token-shaped strings in snippets are replaced with `[redacted]` before they leave the runner. This covers API keys, GitHub/AWS/Slack/Google tokens, JWTs, private keys, and values assigned to `password`/`token`/`apiKey`-like names.
 - With `copilot`, the CLI runs in an empty temporary directory, with shell and write tools denied and only the token in its environment. The only thing it receives is the prompt.
 - Snippets go to the provider you chose, under that provider's terms (GitHub Copilot, Anthropic or OpenAI).
 

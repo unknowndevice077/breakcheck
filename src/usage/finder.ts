@@ -206,13 +206,39 @@ export function globToRegex(glob: string): RegExp {
   return new RegExp(`^${re}$`);
 }
 
+/** Files whose contents must never be read, matched or sent anywhere. */
+const SECRET_FILE = /(^|\/)(\.env(\..*)?|\.npmrc|\.yarnrc(\.yml)?|\.netrc|\.pypirc|id_[a-z0-9]+|.*\.(pem|key|p12|pfx|keystore|jks)|.*secrets?\.[a-z]+|credentials(\.[a-z]+)?)$/i;
+
+export function isSecretFile(file: string): boolean {
+  return SECRET_FILE.test(file);
+}
+
+/** Token shapes that are redacted from snippets before they go to a model or a comment. */
+const SECRET_TOKENS: RegExp[] = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g,
+  /\b(sk|rk|pk)-(live-|test-|proj-|ant-)?[A-Za-z0-9_-]{20,}\b/g,
+  /\bgh[pousr]_[A-Za-z0-9]{30,}\b/g,
+  /\bgithub_pat_[A-Za-z0-9_]{30,}\b/g,
+  /\b(AKIA|ASIA)[0-9A-Z]{16}\b/g,
+  /\bxox[abposr]-[A-Za-z0-9-]{10,}\b/g,
+  /\bAIza[0-9A-Za-z_-]{35}\b/g,
+  /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+];
+/** `password: "..."`, `apiKey = '...'`: keep the key, drop the value. */
+const SECRET_ASSIGNMENT = /((?:password|passwd|secret|token|api[_-]?key|access[_-]?key)["']?\s*[:=]\s*["'])[^"'\s]{8,}(["'])/gi;
+
+export function redact(text: string): string {
+  const tokensGone = SECRET_TOKENS.reduce((t, re) => t.replace(re, '[redacted]'), text);
+  return tokensGone.replace(SECRET_ASSIGNMENT, '$1[redacted]$2');
+}
+
 export function snippet(lines: string[], line: number, context: number): { text: string; start: number } {
   const start = Math.max(1, line - context);
   const end = Math.min(lines.length, line + context);
   const width = String(end).length;
   const out: string[] = [];
   for (let n = start; n <= end; n++) out.push(`${n === line ? '>' : ' '} ${String(n).padStart(width)} | ${lines[n - 1] ?? ''}`);
-  return { text: out.join('\n'), start };
+  return { text: redact(out.join('\n')), start };
 }
 
 /**
@@ -233,6 +259,7 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
   const textCache = new Map<string, string[]>();
 
   const readLines = (f: string): string[] | null => {
+    if (isSecretFile(f)) return null;
     if (textCache.has(f)) return textCache.get(f) ?? null;
     try {
       const full = path.join(root, f);
