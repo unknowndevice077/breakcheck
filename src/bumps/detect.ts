@@ -147,7 +147,8 @@ export async function detectBumps(changedFiles: string[], read: ReadFile, opts: 
           if (!existing.manifests.includes(manifestPath)) existing.manifests.push(manifestPath);
           if (!existing.depTypes.includes(field)) existing.depTypes.push(field);
         } else {
-          byKey.set(key, { name, fromVersion: from, toVersion: to, bumpType, manifests: [manifestPath], depTypes: [field] });
+          const alias = /^npm:((?:@[^/]+\/)?[^@]+)@/.exec(headSpec)?.[1];
+          byKey.set(key, { name, ...(alias && alias !== name ? { packageName: alias } : {}), fromVersion: from, toVersion: to, bumpType, manifests: [manifestPath], depTypes: [field] });
         }
       }
     }

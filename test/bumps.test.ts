@@ -229,3 +229,15 @@ eslint@^7.0.0:
     expect(bumps.map((b) => [b.name, b.fromVersion, b.toVersion])).toEqual([['express', '4.21.2', '5.0.1']]);
   });
 });
+
+describe('detectBumps: npm aliases', () => {
+  it('keeps the local name for usage search and records the real package for release notes', async () => {
+    const lock = (v: string) => JSON.stringify({ lockfileVersion: 3, packages: { '': {}, 'node_modules/http': { name: 'axios', version: v } } });
+    const read = repo(
+      { 'package.json': pkg({ http: 'npm:axios@^0.28.1' }), 'package-lock.json': lock('0.28.1') },
+      { 'package.json': pkg({ http: 'npm:axios@^1.7.0' }), 'package-lock.json': lock('1.7.9') },
+    );
+    const { bumps } = await detectBumps(['package.json', 'package-lock.json'], read, { includePatch: false });
+    expect(bumps).toEqual([{ name: 'http', packageName: 'axios', fromVersion: '0.28.1', toVersion: '1.7.9', bumpType: 'major', manifests: ['package.json'], depTypes: ['dependencies'] }]);
+  });
+});

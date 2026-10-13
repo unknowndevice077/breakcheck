@@ -9,7 +9,7 @@ Only report changes that can break or change the behaviour of existing consumer 
 
 export function extractionPrompt(bump: Bump, notes: ReleaseNotes, retryErrors?: string[]): string {
   const parts = [
-    `Package: ${bump.name}`,
+    `Package: ${bump.packageName ? `${bump.packageName} (installed under the alias "${bump.name}", so consumer code imports "${bump.name}")` : bump.name}`,
     `Upgrade: ${bump.fromVersion} → ${bump.toVersion} (${bump.bumpType})`,
     notes.truncated ? 'Note: the release notes were truncated to fit; sections about breaking changes were kept first.' : '',
     notes.migrationLinks.length ? `Migration guides mentioned (not included): ${notes.migrationLinks.join(', ')}` : '',

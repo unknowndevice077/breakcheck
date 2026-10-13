@@ -29,7 +29,9 @@ export function isPointerOnly(body: string): boolean {
  * as a fallback, and for major bumps a migration guide from the repo.
  */
 export async function gatherNotes(gh: GitHubApi, registry: Registry, bump: Bump, opts: GatherOptions): Promise<ReleaseNotes> {
-  const { name, fromVersion: from, toVersion: to } = bump;
+  const { fromVersion: from, toVersion: to } = bump;
+  // Aliased dependencies ("http": "npm:axios@^1") are documented under the real package.
+  const name = bump.packageName ?? bump.name;
   const { repo, rawRepository } = await registry.repoFor(name, to);
   if (!repo) {
     return empty(null, rawRepository ? `the package's repository (${rawRepository}) is not on GitHub` : 'the npm registry lists no repository for this package');
