@@ -241,3 +241,11 @@ describe('componentScript', () => {
     expect(r.text).not.toContain('"b"');
   });
 });
+
+describe('findUsages: the package name as a search pattern', () => {
+  it('is ignored, since it matches every manifest that depends on the package', () => {
+    const res = findUsages(root, 'react-router', [change('arity', { kind: 'behavior', searchPatterns: ['react-router', "'react-router'"] })]);
+    expect(res.hits.get('arity')).toEqual([]);
+    expect(res.diagnostics).toContain('arity: ignored search pattern `react-router` (the package name)');
+  });
+});

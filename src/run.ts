@@ -277,11 +277,15 @@ async function applyTypeCheck(
   for (const change of changes) {
     const removal = !MODULE_FORMAT_CHANGE.test(`${change.summary} ${change.migration.join(' ')}`);
     const names = change.affectedSymbols.filter((s) => s.type === 'export' || s.type === 'import-path').map((s) => s.name);
+    // Every name the change is about, e.g. `cacheTime`, `fetchQuery` from `QueryClient.fetchQuery`
+    const anyNames = change.affectedSymbols.flatMap((s) => [s.name, s.name.split(/[.#]/).at(-1) ?? s.name]).filter((n) => n.length > 1);
     for (const h of verified.get(change.id) ?? []) {
       const k = `${h.file}:${h.line}`;
       const ds = byLine.get(k);
       const name = h.kind === 'symbol' ? names.find((n) => h.matched === n || h.matched.startsWith(`${n} as `) || h.matched.startsWith(`${n}/`)) : undefined;
-      const relevant = ds && (name === undefined ? ds : ds.filter((d) => mentions(d, name)));
+      // A compiler error confirms a change only when it is about one of the change's names;
+      // "Expected 1 arguments" on a line also matched for an unrelated change confirms nothing.
+      const relevant = ds?.filter((d) => (name === undefined ? anyNames.some((n) => mentions(d, n)) : mentions(d, name)));
       if (relevant?.length) {
         explained.add(k);
         if (h.verdict !== 'yes') Object.assign(h, { verdict: 'yes', reason: `Confirmed by the TypeScript compiler: ${describe(relevant)}` });
