@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findUsages, globToRegex } from '../src/usage/finder.js';
+import { findUsages, globToRegex, snippet } from '../src/usage/finder.js';
 import type { BreakingChange } from '../src/types.js';
 
 const root = new URL('./fixtures/projects/usage/', import.meta.url).pathname;
@@ -161,5 +161,31 @@ describe('globToRegex', () => {
     expect(globToRegex('.eslintrc.*').test('.eslintrc.json')).toBe(true);
     expect(globToRegex('.eslintrc.*').test('.eslintrc')).toBe(false);
     expect(globToRegex('**/next.config.{js,mjs}').test('apps/web/next.config.mjs')).toBe(true);
+  });
+});
+
+import { isSecretFile, redact } from '../src/usage/finder.js';
+describe('privacy guards', () => {
+  it('never reads secret-bearing files', () => {
+    for (const f of ['.env', 'apps/web/.env.local', '.npmrc', 'deploy/key.pem', 'config/secrets.json', 'credentials', '.yarnrc.yml']) expect(isSecretFile(f)).toBe(true);
+    for (const f of ['src/env.ts', 'package.json', '.eslintrc.json', 'next.config.js']) expect(isSecretFile(f)).toBe(false);
+  });
+  it('redacts token-shaped values in snippets', () => {
+    const text = [
+      "const openai = new OpenAI({ apiKey: 'sk-proj-abcdefghijklmnopqrstuvwxyz0123' });",
+      'const gh = "ghp_abcdefghijklmnopqrstuvwxyz0123456789";',
+      'aws = AKIAABCDEFGHIJKLMNOP',
+      'password: "hunter2hunter2"',
+      'const ok = res.json({ id });',
+    ].join('\n');
+    const out = redact(text);
+    expect(out).not.toMatch(/sk-proj-abc|ghp_abc|AKIAABC|hunter2/);
+    expect(out).toContain("apiKey: '[redacted]'");
+    expect(out).toContain('password: "[redacted]"');
+    expect(out).toContain('const ok = res.json({ id });');
+  });
+  it('snippets sent to the model are redacted', () => {
+    const lines = ['import x from "pkg";', 'const key = "ghp_abcdefghijklmnopqrstuvwxyz0123456789";', 'x();'];
+    expect(snippet(lines, 3, 10).text).not.toContain('ghp_');
   });
 });
