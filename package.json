@@ -1,0 +1,39 @@
+{
+  "name": "breakcheck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Action: tells you which breaking changes in a dependency upgrade actually hit your code.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "ncc build src/main.ts -o dist --source-map --license licenses.txt",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "all": "npm run lint && npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@actions/cache": "6.3.0",
+    "@actions/core": "3.0.1",
+    "@actions/github": "9.1.1",
+    "@anthropic-ai/sdk": "0.133.0",
+    "@yarnpkg/parsers": "3.1.0",
+    "openai": "7.32.0",
+    "semver": "7.8.5",
+    "ts-morph": "28.0.0",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "@types/semver": "7.8.0",
+    "@vercel/ncc": "0.45.0",
+    "eslint": "10.12.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.4"
+  }
+}
