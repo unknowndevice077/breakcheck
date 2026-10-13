@@ -140,6 +140,8 @@ Outputs: `affected-count`, `possibly-affected-count`, `mode` (`ai`/`rules`/`mixe
 - **JavaScript/TypeScript with npm, pnpm or yarn only.** Only direct dependencies are analysed.
 - **Usage search is static.** Instance members such as `res.json` are matched by property name in files that import the package, so the AI step or a human needs to confirm them. Values passed around through variables, `eval` and string-built imports are not followed.
 - **The finder only sees what the release notes say.** If a project doesn't document a break, breakcheck can't know about it. Projects without GitHub releases or a changelog get the ❓ headline.
+  - Example: ESLint 9 rejects `--ext` under flat config, but neither the v9 release notes nor the v9 migration guide name the flag. breakcheck flags your `.eslintrc*` file, not the `--ext` in your scripts.
+- **Long upgrades are summarised to fit.** For a range like react-router 6.30 → 7.18 (50+ releases), the notes are cut to about 30k characters, keeping Breaking/Removed/Migration sections first. A rule-based pass over the same notes acts as a safety net for anything the model leaves out.
 - **Migration guides are read when they live in the package's GitHub repo.** Guides hosted only on a separate website are linked, not read.
 - **Rule-based mode is a heuristic.** It reads Breaking/Removed/Deprecated/Migration sections, `type!:` commits and backticked identifiers. It finds more candidates and fewer exact matches than AI mode.
 
@@ -173,6 +175,16 @@ CI runs lint, typecheck and tests, and fails if `dist/` doesn't match a fresh bu
   - Model replies are canned per scenario (`test/fixtures/e2e/*/model.json`) and returned in the provider's wire format, so the real SDK parsing runs. They were written for these tests, not captured from live model calls.
 - **Snapshots** of the rendered comment for each headline state are in `test/e2e/__snapshots__/`.
 - **`test/dist.test.ts`** runs the bundled `dist/index.js` as a real action process against a local server.
+
+**Tested on real GitHub Actions.** A demo PR bumped express 4.22 → 5.3, eslint 8.57 → 9.39 and react-router 6.30 → 7.18 on a dummy app with planted breakages ([unknowndevice077/breakcheck#1](https://github.com/unknowndevice077/breakcheck/pull/1)). Copilot with `GITHUB_TOKEN` worked with no secrets.
+
+- **Found:** every planted break except `eslint --ext` (see Limitations), including a removed export imported under an alias (`json as toJson`).
+- **Comment:** updated in place on each re-run.
+- **Cache:** re-runs took about 1 minute instead of about 3.5.
+- **Fixed after those runs:**
+  - release notes that only point to the CHANGELOG;
+  - empty version headers using up the size budget;
+  - file globs that matched every file.
 
 To try it on a real repo, see [`examples/`](examples/).
 
