@@ -149,9 +149,14 @@ function changeSection(run: RunReport, p: PackageReport, c: ChangeReport, limits
     '',
   ];
   let diffs = 0;
+  const shown: { file: string; before: string }[] = [];
   for (const h of relevant.slice(0, limits.hits)) {
     lines.push(hitLine(run, h));
-    const d = diffs < limits.diffs ? diffBlock(h) : '';
+    // Neighbouring hits (import, call, option) often get the same fix; show it once per file.
+    const before = h.fix?.before.trim() ?? '';
+    const repeat = shown.some((x) => x.file === h.file && before !== '' && x.before.includes(before));
+    if (h.fix && !repeat) shown.push({ file: h.file, before: h.fix.before });
+    const d = diffs < limits.diffs && !repeat ? diffBlock(h) : '';
     if (d) {
       lines.push(d);
       diffs++;
