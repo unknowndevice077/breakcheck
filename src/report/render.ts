@@ -81,7 +81,8 @@ function modeLine(run: RunReport): string {
   const reasons = [...new Set(rules.map((p) => p.fallbackReason).filter(Boolean))];
   const why = reasons.length ? `: ${reasons.join('; ')}` : '';
   if (ai.length && !rules.length) return `**Mode:** AI-assisted via ${code(ai[0]?.modelLabel ?? run.providerLabel ?? 'unknown')}`;
-  if (!ai.length) return `**Mode:** Rule-based (no AI available), lower confidence${why}`;
+  const aiVerified = rules.some((p) => p.changes.some((c) => c.hits.some((h) => h.verdict !== 'possibly')));
+  if (!ai.length) return `**Mode:** Rule-based ${aiVerified ? 'extraction with AI-verified matches' : '(no AI available)'}, lower confidence${why}`;
   return `**Mode:** AI-assisted via ${code(ai[0]?.modelLabel ?? '')} for ${ai.map((p) => code(p.bump.name)).join(', ')}; rule-based (lower confidence) for ${rules.map((p) => code(p.bump.name)).join(', ')}${why}`;
 }
 

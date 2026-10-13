@@ -154,17 +154,24 @@ export function assembleNotes(blocks: NoteBlock[], budget: number): { text: stri
   const total = blocks.reduce((n, b) => n + b.title.length + b.url.length + 8, 0) + chunks.reduce((n, c) => n + c.text.length + 2, 0);
   if (total <= budget) return { text: render(blocks, chunks), truncated: false };
 
-  let remaining = budget - blocks.reduce((n, b) => n + b.title.length + b.url.length + 8, 0);
+  // A block's "=== title (url) ===" header is only paid for (and shown) once one of
+  // its sections is kept; dozens of empty patch-release headers must not eat the budget.
+  const headerCost = (bi: number) => (blocks[bi]?.title.length ?? 0) + (blocks[bi]?.url.length ?? 0) + 10;
+  const paid = new Set<number>();
+  let remaining = budget;
   const keep = new Set<Chunk>();
   const byPriority = [...chunks].sort((a, b) => b.priority - a.priority || a.block - b.block || a.order - b.order);
   for (const c of byPriority) {
     if (remaining <= 200) break;
-    if (c.text.length + 2 <= remaining) {
+    const header = paid.has(c.block) ? 0 : headerCost(c.block);
+    if (c.text.length + 2 + header <= remaining) {
       keep.add(c);
-      remaining -= c.text.length + 2;
-    } else if (c.priority >= 2) {
-      const cut = { ...c, text: condense(c.text, remaining - 2) };
+      paid.add(c.block);
+      remaining -= c.text.length + 2 + header;
+    } else if (c.priority >= 2 && remaining - header > 300) {
+      const cut = { ...c, text: condense(c.text, remaining - header - 2) };
       keep.add(cut);
+      paid.add(c.block);
       chunks.splice(chunks.indexOf(c), 1, cut);
       remaining = 0;
     }
@@ -194,13 +201,9 @@ export function condense(text: string, max: number): string {
 
 function render(blocks: NoteBlock[], chunks: Chunk[]): string {
   return blocks
-    .map((b, bi) => {
-      const body = chunks
-        .filter((c) => c.block === bi)
-        .map((c) => c.text)
-        .join('\n\n');
-      return `=== ${b.title} (${b.url}) ===\n${body}`;
-    })
+    .map((b, bi) => ({ b, body: chunks.filter((c) => c.block === bi).map((c) => c.text) }))
+    .filter(({ body }) => body.length)
+    .map(({ b, body }) => `=== ${b.title} (${b.url}) ===\n${body.join('\n\n')}`)
     .join('\n\n');
 }
 
