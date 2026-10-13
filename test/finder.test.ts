@@ -119,6 +119,13 @@ describe('findUsages: the package itself as an import path', () => {
   });
 });
 
+describe('findUsages: receivers named after the package', () => {
+  it('treats ReactDOM.render as the package member, not any .render (root.render is the replacement)', () => {
+    const res = findUsages(root, 'react-dom', [change('render', { affectedSymbols: [{ name: 'ReactDOM.render', type: 'member' }] })]);
+    expect(where(res.hits.get('render'))).toEqual(['src/dom.tsx:5']);
+  });
+});
+
 describe('findUsages: module-format changes', () => {
   it('"now ESM-only" matches exactly the require() calls of the package', () => {
     const res = findUsages(root, 'react-router', [
