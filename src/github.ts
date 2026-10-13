@@ -22,6 +22,8 @@ export interface GitHubApi {
   listReleases(owner: string, repo: string, page: number): Promise<Release[]>;
   getReleaseByTag(owner: string, repo: string, tag: string): Promise<Release | null>;
   listPullFiles(owner: string, repo: string, pull: number): Promise<string[]>;
+  /** The commit the PR branched from (what GitHub diffs the PR against) */
+  mergeBase(owner: string, repo: string, base: string, head: string): Promise<string | null>;
   listIssueComments(owner: string, repo: string, issue: number): Promise<IssueComment[]>;
   createComment(owner: string, repo: string, issue: number, body: string): Promise<{ id: number; url: string }>;
   updateComment(owner: string, repo: string, id: number, body: string): Promise<{ id: number; url: string }>;
@@ -139,6 +141,15 @@ export function createGitHubApi(token: string, opts: { fetch?: typeof fetch; bas
         if (data.length < 100) break;
       }
       return out;
+    },
+    async mergeBase(owner, repo, base, head) {
+      try {
+        const d = await call<{ merge_base_commit?: { sha?: string } }>('GET /repos/{owner}/{repo}/compare/{basehead}', { owner, repo, basehead: `${base}...${head}`, per_page: 1 });
+        return d.merge_base_commit?.sha ?? null;
+      } catch (e) {
+        if (notFound(e)) return null;
+        throw e;
+      }
     },
     async listIssueComments(owner, repo, issue) {
       const out: IssueComment[] = [];
