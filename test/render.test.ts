@@ -21,3 +21,46 @@ describe('inlineHtml (<summary> text)', () => {
     expect(inlineHtml('`json` removed; see @remix-run/router <b>now</b>')).toBe('<code>json</code> removed; see <code>@remix-run/router</code> &lt;b&gt;now&lt;/b&gt;');
   });
 });
+
+import { renderComment } from '../src/report/render.js';
+import type { PackageReport, RunReport, VerifiedHit } from '../src/types.js';
+
+function bigReport(packages: number, changes: number, hitsPer: number): RunReport {
+  const pkgs: PackageReport[] = Array.from({ length: packages }, (_, p) => ({
+    bump: { name: `pkg-${p}`, fromVersion: '1.0.0', toVersion: '2.0.0', bumpType: 'major', manifests: ['package.json'], depTypes: ['dependencies'] },
+    notes: { repo: null, text: 'x', sources: [], migrationLinks: [], truncated: false },
+    mode: 'ai',
+    modelLabel: 'copilot/auto',
+    fromCache: false,
+    unanalysed: [],
+    changes: Array.from({ length: changes }, (_, c) => ({
+      change: { id: `c${c}`, summary: `Change ${c} of pkg-${p}: something long enough to matter `.repeat(2), kind: 'removed', affectedSymbols: [{ name: `fn${c}`, type: 'export' }], searchPatterns: [], fileGlobs: [], migration: ['Do the thing', 'Then the other thing'], sourceUrl: 'https://example.com/notes', confidence: 'high' },
+      hits: Array.from({ length: hitsPer }, (_, h): VerifiedHit => ({
+        id: `c${c}#${h}`, changeId: `c${c}`, file: `src/feature-${h}/file.ts`, line: h + 1, kind: 'symbol', matched: `fn${c}`, snippet: '', snippetStartLine: 1,
+        verdict: 'yes', reason: 'Calls the removed function with the old signature.', fix: { before: `  fn${c}(a, b);`, after: `  fn${c}({ a, b });` },
+      })),
+    })),
+  }));
+  return { packages: pkgs, skipped: [], repo: { owner: 'o', repo: 'r' }, headSha: 'abc', providerLabel: 'copilot/auto' };
+}
+
+describe('renderComment size limit', () => {
+  it('stays under GitHub\'s limit with well-formed markup and the headline, table and footer intact', () => {
+    const body = renderComment(bigReport(10, 30, 8));
+    expect(body.length).toBeLessThanOrEqual(65_536);
+    expect(body.split('<details>').length).toBe(body.split('</details>').length);
+    expect((body.match(/```/g) ?? []).length % 2).toBe(0);
+    expect(body).toMatch(/^## ⚠️ 300 breaking changes affect this repo/m);
+    expect(body).toContain('| `pkg-9`'.replace('`pkg-9`', '[`pkg-9`]'));
+    expect(body).toContain('This is advisory');
+  });
+
+  it('degrades gracefully for absurd sizes: drops whole sections, never cuts markup', () => {
+    const body = renderComment(bigReport(40, 60, 20));
+    expect(body.length).toBeLessThanOrEqual(65_536);
+    expect(body.split('<details>').length).toBe(body.split('</details>').length);
+    expect((body.match(/```/g) ?? []).length % 2).toBe(0);
+    expect(body).toMatch(/more affected change\(s\) not shown/);
+    expect(body).toContain('This is advisory');
+  });
+});
