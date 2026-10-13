@@ -46,10 +46,20 @@ export function tagCandidates(pkg: string, version: string): string[] {
   return [...new Set(list)];
 }
 
-/** Whether a version lies in the half-open range (from, to]. Prereleases only count if `to` itself is one. */
-export function inRange(version: string, from: string, to: string): boolean {
+/**
+ * Whether a version lies in the half-open range (from, to]. Prereleases only count if `to`
+ * itself is a prerelease of that major, or (with `majorPrereleases`) if they are
+ * prereleases of a major the bump crosses: Express lists most v5 removals under
+ * 5.0.0-alpha.x, ESLint under 9.0.0-alpha.x.
+ */
+export function inRange(version: string, from: string, to: string, majorPrereleases = false): boolean {
   if (!semver.valid(version)) return false;
-  if (semver.prerelease(version) && !(semver.prerelease(to) && semver.major(version) === semver.major(to))) return false;
+  if (semver.prerelease(version)) {
+    const sameMajorAsPreTo = semver.prerelease(to) && semver.major(version) === semver.major(to);
+    const crossedMajorPre =
+      majorPrereleases && semver.minor(version) === 0 && semver.patch(version) === 0 && semver.major(version) > semver.major(from);
+    if (!sameMajorAsPreTo && !crossedMajorPre) return false;
+  }
   return semver.gt(version, from) && semver.lte(version, to);
 }
 
