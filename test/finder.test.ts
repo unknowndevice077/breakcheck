@@ -119,6 +119,15 @@ describe('findUsages: the package itself as an import path', () => {
   });
 });
 
+describe('findUsages: module-format changes', () => {
+  it('"now ESM-only" matches exactly the require() calls of the package', () => {
+    const res = findUsages(root, 'react-router', [
+      change('esm-only', { kind: 'runtime', summary: 'react-router is now pure ESM and can no longer be loaded with require()', affectedSymbols: [{ name: 'react-router', type: 'import-path' }] }),
+    ]);
+    expect(where(res.hits.get('esm-only'))).toEqual(['server/legacy.cjs:1', 'server/legacy.cjs:2', 'server/legacy.cjs:7']);
+  });
+});
+
 describe('findUsages: file globs every project matches', () => {
   it('ignores package.json/lockfile globs instead of flagging every repo', () => {
     const res = findUsages(root, 'react-router', [

@@ -7,6 +7,7 @@ const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/;
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache', 'vendor', '.yarn', '.pnpm-store']);
 const MAX_FILE_BYTES = 1_000_000;
 const MAX_FILES = 20_000;
+const MODULE_FORMAT = /\b(esm|es modules?|ecmascript modules?|commonjs|cjs|require\(\)?|pure esm)\b/i;
 const SAMPLE_SOURCE_FILES = ['src/index.ts', 'src/App.tsx', 'src/index.js', 'src/App.jsx', 'src/index.mjs', 'src/index.cjs'];
 const UBIQUITOUS_FILES = ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock', 'README.md', 'tsconfig.json', '.gitignore'];
 /** Receiver names with a fixed conventional meaning (Express/Koa/Fetch style). */
@@ -34,7 +35,7 @@ interface Bindings {
   /** exported names re-exported from this file: name → line */
   reexports: Map<string, number>;
   /** lines of every import/require/re-export of the package */
-  importLines: { line: number; specifier: string }[];
+  importLines: { line: number; specifier: string; via: 'import' | 'export' | 'require' | 'dynamic' }[];
   dynamic: number[];
   exportStar: number[];
 }
@@ -106,7 +107,7 @@ function collectBindings(sf: SourceFile, pkg: string, extraSpecifiers: string[])
     const spec = imp.getModuleSpecifierValue();
     if (!wanted(spec)) continue;
     const line = imp.getStartLineNumber();
-    b.importLines.push({ line, specifier: spec });
+    b.importLines.push({ line, specifier: spec, via: 'import' });
     if (!matchesPackage(spec, pkg)) continue;
     const def = imp.getDefaultImport();
     if (def) {
@@ -124,7 +125,7 @@ function collectBindings(sf: SourceFile, pkg: string, extraSpecifiers: string[])
     const spec = exp.getModuleSpecifierValue();
     if (!spec || !wanted(spec)) continue;
     const line = exp.getStartLineNumber();
-    b.importLines.push({ line, specifier: spec });
+    b.importLines.push({ line, specifier: spec, via: 'export' });
     if (!matchesPackage(spec, pkg)) continue;
     const named = exp.getNamedExports();
     if (!named.length && !exp.getNamespaceExport()) b.exportStar.push(line);
@@ -136,7 +137,7 @@ function collectBindings(sf: SourceFile, pkg: string, extraSpecifiers: string[])
     const ref = ie.getModuleReference();
     const m = ref.getText().match(/^require\(\s*['"]([^'"]+)['"]\s*\)$/);
     if (m?.[1] && wanted(m[1])) {
-      b.importLines.push({ line: ie.getStartLineNumber(), specifier: m[1] });
+      b.importLines.push({ line: ie.getStartLineNumber(), specifier: m[1], via: 'require' });
       if (matchesPackage(m[1], pkg)) b.namespaces.set(ie.getName(), ie.getStartLineNumber());
     }
   }
@@ -152,7 +153,7 @@ function collectBindings(sf: SourceFile, pkg: string, extraSpecifiers: string[])
     }
     if (!wanted(spec)) continue;
     const line = call.getStartLineNumber();
-    b.importLines.push({ line, specifier: spec });
+    b.importLines.push({ line, specifier: spec, via: req ? 'require' : 'dynamic' });
     if (!matchesPackage(spec, pkg)) continue;
     // Walk up through `await` and parentheses to the declaration, if any
     let target: Node = call;
@@ -299,7 +300,14 @@ export function findUsages(root: string, pkg: string, changes: BreakingChange[],
     for (const change of changes) {
       for (const sym of change.affectedSymbols) {
         if (sym.type === 'import-path') {
-          if (sym.name === pkg) continue; // would match every import of the package
+          if (sym.name === pkg) {
+            // The package itself matches every import, which says nothing, except for module-format
+            // changes ("now ESM-only"): then exactly the require() calls are affected.
+            if (MODULE_FORMAT.test(`${change.summary} ${change.migration.join(' ')}`)) {
+              for (const il of b.importLines) if (il.via === 'require' && il.specifier === pkg) add(change, file, il.line, 'symbol', `require('${pkg}')`);
+            }
+            continue;
+          }
           for (const il of b.importLines) if (matchesPackage(il.specifier, sym.name)) add(change, file, il.line, 'symbol', il.specifier);
           continue;
         }

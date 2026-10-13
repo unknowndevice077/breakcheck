@@ -104,6 +104,7 @@ function empty(repo: RepoRef | null, missingReason: string): ReleaseNotes {
 async function findReleases(gh: GitHubApi, repo: RepoRef, name: string, from: string, to: string, maxPages: number) {
   const all: { tag: string; body: string; url: string; version: string }[] = [];
   const byTag = new Map<string, { tag: string; body: string; url: string }>();
+  let reachedFrom = false;
   for (let page = 1; page <= maxPages; page++) {
     const list = await gh.listReleases(repo.owner, repo.repo, page);
     for (const rel of list) if (!rel.draft) byTag.set(rel.tag, rel);
@@ -112,7 +113,25 @@ async function findReleases(gh: GitHubApi, repo: RepoRef, name: string, from: st
       .map((x) => parseTag(x.tag))
       .filter((p): p is NonNullable<typeof p> => !!p && prefixMatches(p.prefix, name))
       .map((p) => p.version);
-    if (list.length < 100 || (versions.length && versions.every((v) => semver.lte(v, from)))) break;
+    if (list.length < 100 || (versions.length && versions.some((v) => semver.lte(v, from)))) {
+      reachedFrom = true;
+      break;
+    }
+  }
+  // Projects that release on every merge (TanStack, Next.js canaries) can have more releases
+  // than we page through; the x.0.0 release that lists the breaking changes must not be lost.
+  if (!reachedFrom) {
+    for (const major of majorsCrossed(from, to)) {
+      const version = `${major}.0.0`;
+      if ([...byTag.keys()].some((t) => parseTag(t)?.version === version && prefixMatches(parseTag(t)?.prefix ?? '', name))) continue;
+      for (const tag of tagCandidates(name, version)) {
+        const rel = await gh.getReleaseByTag(repo.owner, repo.repo, tag);
+        if (rel && !rel.draft) {
+          byTag.set(rel.tag, rel);
+          break;
+        }
+      }
+    }
   }
   for (const t of selectTags([...byTag.keys()], name, from, to)) {
     const rel = byTag.get(t.tag);
